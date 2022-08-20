@@ -1,7 +1,12 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { DartClass, DartImports, dartStringRegExp } from "./parser";
+import {
+  DartClass,
+  DartFunction,
+  DartImports,
+  dartStringRegExp,
+} from "./parser";
 
 const COMMAND = "dart-fixer.helloWorld";
 
@@ -42,7 +47,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   console.log(dartStringRegExp);
   console.log(DartClass.classRegExp);
-  console.log(DartClass.functionRegExp);
+  console.log(DartFunction.functionRegExp);
 }
 
 async function printDefinitionsForActiveEditor(): Promise<void> {
@@ -70,7 +75,7 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
   };
 
   provideCodeActions(
-    document: vscode.TextDocument,
+    document: vscode.TextDocument
     // range: vscode.Range | vscode.Selection,
     // context: vscode.CodeActionContext,
     // token: vscode.CancellationToken

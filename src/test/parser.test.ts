@@ -31,7 +31,7 @@ class ///
 
   }
 
-class Name2 extends
+abstract class Name2 extends
  Other ///
  {}
 
@@ -44,7 +44,7 @@ class Name4< WP  extends String?>{
 }
 `;
     const values = new DartImports(text);
-    const classesObjects = values.classesObjects;
+    const classesObjects = values.classes;
 
     const c1 = classesObjects[0];
     assert.deepStrictEqual(c1.name, "Name");
@@ -52,6 +52,7 @@ class Name4< WP  extends String?>{
     const c2 = classesObjects[1];
     assert.deepStrictEqual(c2.name, "Name2");
     assert.deepStrictEqual(c2.extendsBound, "Other");
+    assert.deepStrictEqual(c2.isAbstract, true);
 
     const c3 = classesObjects[2];
     assert.deepStrictEqual(c3.name, "Name3");

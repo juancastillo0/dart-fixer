@@ -23,6 +23,7 @@
         "@typescript-eslint/naming-convention": "warn",
         "@typescript-eslint/semi": "warn",
         "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-unnecessary-condition": "off",
         "curly": "warn",
         "eqeqeq": "warn",
         "no-throw-literal": "warn",
