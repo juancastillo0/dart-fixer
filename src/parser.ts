@@ -16,26 +16,15 @@ export class DartImports {
     const replaced = text
       .replace(DartImports.commentRegExp, "")
       .replace(RegExp(dartStringRegExp, "g"), '""');
-    // for (const line of text.split("\n")) {
-    const importMatch = [...replaced.matchAll(DartImports.importRegExp)];
-    //   if (importMatch) {
-    this.imports.push(...importMatch);
-    // continue;
-    //   }
-    const exportMatch = [...replaced.matchAll(DartImports.exportRegExp)];
-    //   if (exportMatch) {
-    this.exports.push(...exportMatch);
-    // continue;
-    //   }
-    // }
-    const classesMatch = [...replaced.matchAll(DartClass.classRegExp)];
-    this.classes.push(...classesMatch);
 
+    this.imports.push(...replaced.matchAll(DartImports.importRegExp));
+    this.exports.push(...replaced.matchAll(DartImports.exportRegExp));
+
+    this.classes.push(...replaced.matchAll(DartClass.classRegExp));
     this.classesObjects.push(
-      ...classesMatch.map((c) => new DartClass(c, replaced))
+      ...this.classes.map((c) => new DartClass(c, replaced))
     );
-    const functionMatch = [...replaced.matchAll(DartClass.functionRegExp)];
-    this.functions.push(...functionMatch);
+    this.functions.push(...replaced.matchAll(DartClass.functionRegExp));
   }
 
   get hasImports(): boolean {
@@ -98,14 +87,15 @@ export class DartClass {
 
   isAbstract: boolean;
   name: string;
-  extendsBound: string;
+  extendsBound: string | undefined;
   constructors: Array<RegExpMatchArray>;
 
   readonly fields: Array<DartField> = [];
   constructor(public match: RegExpMatchArray, text: string) {
     this.isAbstract = !!match[1];
     this.name = match[2];
-    this.extendsBound = match.groups!["extends"];
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    this.extendsBound = match.groups!["extends"]?.trim();
     this.constructors = [
       ...text.matchAll(DartClass.constructorRegExp(this.name)),
     ];
