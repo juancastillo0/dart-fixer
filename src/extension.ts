@@ -71,9 +71,9 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
 
   provideCodeActions(
     document: vscode.TextDocument,
-    range: vscode.Range | vscode.Selection,
-    context: vscode.CodeActionContext,
-    token: vscode.CancellationToken
+    // range: vscode.Range | vscode.Selection,
+    // context: vscode.CodeActionContext,
+    // token: vscode.CancellationToken
   ): Array<vscode.CodeAction> {
     const text = document.getText();
     console.log(new DartImports(text));
