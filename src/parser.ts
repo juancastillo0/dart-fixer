@@ -344,3 +344,89 @@ export class DartFunction {
     ].map((p) => new DartFunctionParam(p, this, state));
   }
 }
+
+export class DartType {
+  text: string;
+  generics: Array<DartType>;
+  name: string;
+
+  constructor(rawText: string) {
+    this.text = rawText.replace(/\s/g, "");
+    const brackets = getBrackets(this.text, { start: "<", end: ">" });
+    const topLevel = brackets.bracketsNested[0];
+    this.name = !topLevel
+      ? this.isNullable
+        ? this.text.substring(0, this.text.length - 1)
+        : this.text
+      : this.text.substring(0, topLevel.start);
+
+    this.generics = [];
+    if (topLevel) {
+      let start = topLevel.start + 1;
+      let commaIndex = this.text.indexOf(",", start);
+      let i = 0;
+      while (commaIndex !== -1) {
+        const child = topLevel.children[i];
+        const end = child ? child.end! + 1 : commaIndex;
+
+        this.generics.push(new DartType(this.text.substring(start, end)));
+        start = end + 1;
+        commaIndex = this.text.indexOf(",", start);
+        if (child) {
+          i += 1;
+        }
+      }
+      if (i === 0) {
+        this.generics.push(
+          new DartType(this.text.substring(start, topLevel.end))
+        );
+      }
+    }
+  }
+
+  get isNullable(): boolean {
+    return this.text.endsWith("?");
+  }
+  get isPrimitive(): boolean {
+    return this.isNum || this.isString || this.isBool || this.isNull;
+  }
+  get isCollection(): boolean {
+    return this.isList || this.isMap || this.isSet;
+  }
+
+  get isMap(): boolean {
+    return this.name === "Map";
+  }
+  get isList(): boolean {
+    return this.name === "List";
+  }
+  get isSet(): boolean {
+    return this.name === "Set";
+  }
+
+  get isDateTime(): boolean {
+    return this.name === "DateTime";
+  }
+  get isDuration(): boolean {
+    return this.name === "Duration";
+  }
+
+  get isInt(): boolean {
+    return this.name === "int";
+  }
+  get isDouble(): boolean {
+    return this.name === "double";
+  }
+  get isNum(): boolean {
+    return this.name === "num" || this.isInt || this.isDouble;
+  }
+  get isString(): boolean {
+    return this.name === "String";
+  }
+  get isBool(): boolean {
+    return this.name === "bool";
+  }
+  get isNull(): boolean {
+    return this.name === "Null";
+  }
+}

@@ -5,9 +5,7 @@ export const generateFromJson = (dartConstructor: DartConstructor): string => {
 factory ${dartConstructor.dartClass.name}.fromJson(Map json) {
   return ${dartConstructor.dartClass.name}(
     ${dartConstructor.params
-      .map(
-        (p) => (p.isNamed ? `${p.name}:` : "") + ` ${castJsonValue(p)},`
-      )
+      .map((p) => (p.isNamed ? `${p.name}:` : "") + ` ${castJsonValue(p)},`)
       .join("\n    ")}
   );  
 }
