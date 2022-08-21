@@ -1,5 +1,11 @@
 import { Bracket, Brackets, getBrackets } from "./parser-utils";
 
+interface RegExpMatchArray extends Array<string> {
+  index?: number;
+  input?: string;
+  groups?: Record<string, string | undefined>;
+}
+
 export class DartImports {
   static commentRegExp = /\/\/\/?[^\n]*/g;
   static dartStringRegExp = /''/g;
@@ -17,8 +23,8 @@ export class DartImports {
 
   constructor(text: string) {
     this.cleanText = text
-      .replace(DartImports.commentRegExp, "")
-      .replace(RegExp(dartStringRegExp, "g"), '""');
+      .replace(RegExp(dartStringRegExp, "g"), '""')
+      .replace(DartImports.commentRegExp, "");
     this.brackets = getBrackets(this.cleanText);
     const replaced = this.cleanText;
 
@@ -36,10 +42,12 @@ export class DartImports {
     this.functions.push(
       ...[...replaced.matchAll(DartFunction.functionRegExp)].map((f) => {
         const fBracket = this.brackets.findBracket(f.index!);
-        return new DartFunction(
-          f,
-          fBracket ? classesBrackets.get(fBracket.start) : undefined
-        );
+        const dartClass = fBracket ? classesBrackets.get(fBracket.start) : null;
+        const func = new DartFunction(f, dartClass ?? null);
+        if (dartClass) {
+          dartClass.methods.push(func);
+        }
+        return func;
       })
     );
   }
@@ -98,15 +106,16 @@ export class DartClass {
 
   isAbstract: boolean;
   name: string;
-  extendsBound: string | undefined;
+  extendsBound: string | null;
   constructors: Array<DartConstructor>;
   fields: Array<DartField>;
+  methods: Array<DartFunction> = [];
   bracket: Bracket;
 
   constructor(public match: RegExpMatchArray, ctx: DartImports) {
     this.isAbstract = !!match[1];
     this.name = match[2];
-    this.extendsBound = match.groups!["extends"]?.trim();
+    this.extendsBound = match.groups!["extends"]?.trim() ?? null;
 
     this.bracket = ctx.brackets.findBracket(match.index! + match[0].length)!;
     const text = ctx.cleanText.substring(this.bracket.start, this.bracket.end);
@@ -138,52 +147,72 @@ export class DartConstructor {
     this.isConst = !!match[1];
     this.isFactory = !!match[2];
     this.name = match[3] ? match[3].split(".")[1].trim() : null;
+    const state: ParamPositionState = {
+      isNamed: false,
+      isOptional: false,
+    };
     this.params = [
       ...(match.groups!["params"] ?? "").matchAll(
         DartConstructorParam.constructorParameterRegExp
       ),
-    ].map((p) => new DartConstructorParam(p, this));
+    ].map((p) => new DartConstructorParam(p, this, state));
   }
+}
+
+interface ParamPositionState {
+  isOptional: boolean;
+  isNamed: boolean;
 }
 
 export interface DartParam {
   isRequired: boolean;
-  defaultValue: string | undefined;
+  isNamed: boolean;
+  defaultValue: string | null;
   name: string;
-  type: string | undefined;
-  // TODO: is named, is positional
+  type: string | null;
 }
 
 export class DartConstructorParam implements DartParam {
   static constructorParameterRegExp = RegExp(
-    `(\\s*[{\\[]?\\s*(required\\s+)?(${dartType}\\s|this\\.|super\\.)\\s*${dartName}\\s*(=\\s*${dartValue}\\s*)?,?\\s*[}\\]]?\\s*)`,
+    `(\\s*(?<bracket>[{\\[])?\\s*(required\\s+)?(?<typeOrPrefix>${dartType}\\s|this\\.|super\\.)\\s*(?<name>${dartName})\\s*(?:=\\s*(?<defaultValue>${dartValue})\\s*)?,?\\s*(?<endBracket>[}\\]])?\\s*)`,
     "g"
   );
 
   isThis: boolean;
   isSuper: boolean;
   isRequired: boolean;
-  defaultValue: string | undefined;
+  isNamed: boolean;
+  defaultValue: string | null;
   name: string;
-  type: string | undefined;
+  type: string | null;
   dartConstructor: DartConstructor;
 
   constructor(
     public match: RegExpMatchArray,
-    dartConstructor: DartConstructor
+    dartConstructor: DartConstructor,
+    options: ParamPositionState
   ) {
     this.dartConstructor = dartConstructor;
-    this.isRequired = !!match[2];
-    this.isThis = match[3] === "this.";
-    this.isSuper = match[3] === "super.";
-    this.name = match[10];
-    this.defaultValue = match[12];
+
+    this.isNamed = options.isNamed || match.groups!["bracket"] === "{";
+    options.isNamed = this.isNamed && match.groups!["endBracket"] !== "{";
+    const isOptionalPositional =
+      options.isOptional || match.groups!["bracket"] === "[";
+    options.isOptional =
+      isOptionalPositional && match.groups!["endBracket"] !== "]";
+    this.isRequired = !!match[3] || (!this.isNamed && !isOptionalPositional);
+
+    const typeOrPrefix = match.groups!["typeOrPrefix"]!;
+    this.isThis = typeOrPrefix === "this.";
+    this.isSuper = typeOrPrefix === "super.";
+    this.name = match.groups!["name"]!;
+    this.defaultValue = match.groups!["defaultValue"]?.trim() ?? null;
     if (!this.isThis && !this.isSuper) {
-      this.type = match[3].trim();
+      this.type = typeOrPrefix.trim();
     } else {
-      this.type = dartConstructor.dartClass.fields.find(
-        (v) => v.name === this.name
-      )?.type;
+      this.type =
+        dartConstructor.dartClass.fields.find((v) => v.name === this.name)
+          ?.type ?? null;
     }
   }
 }
@@ -198,41 +227,58 @@ export class DartField {
   isFinal: boolean;
   name: string;
   isVariable: boolean;
-  type: string | undefined;
-  defaultValue: string | undefined;
+  type: string | null;
+  defaultValue: string | null;
   dartClass: DartClass;
 
   constructor(public match: RegExpMatchArray, dartClass: DartClass) {
     this.dartClass = dartClass;
     this.isStatic = !!match[1];
     this.isFinal = !!match[3];
-    this.name = match.groups!["name"];
+    this.name = match.groups!["name"]!;
     this.isVariable = match.groups!["type"] === "var";
     if (!this.isVariable) {
-      this.type = match.groups!["type"];
+      this.type = match.groups!["type"] ?? null;
+    } else {
+      this.type = null;
     }
-    this.defaultValue = match.groups!["defaultValue"]?.substring(2).trim();
+    this.defaultValue =
+      match.groups!["defaultValue"]?.substring(1).trim() ?? null;
   }
 }
 
 export class DartFunctionParam implements DartParam {
   static parameterRegExp = RegExp(
-    `(\\s*[{\\[]?\\s*(required\\s+)?${dartType}\\s+(?<name>${dartName})\\s*(?<defaultValue>=\\s*${dartValue}\\s*)?,?\\s*[}\\]]?\\s*)`,
+    `(\\s*(?<bracket>[{\\[])?\\s*(required\\s+)?${dartType}\\s+(?<name>${dartName})\\s*(?<defaultValue>=\\s*${dartValue}\\s*)?,?\\s*(?<endBracket>[}\\]])?\\s*)`,
     "g"
   );
 
   isRequired: boolean;
-  defaultValue: string | undefined;
+  isNamed: boolean;
+  defaultValue: string | null;
   name: string;
-  type: string | undefined;
+  type: string | null;
   dartFunction: DartFunction;
 
-  constructor(public match: RegExpMatchArray, dartFunction: DartFunction) {
+  constructor(
+    public match: RegExpMatchArray,
+    dartFunction: DartFunction,
+    options: ParamPositionState
+  ) {
     this.dartFunction = dartFunction;
-    this.isRequired = !!match[2];
-    this.type = match[3].trim();
-    this.name = match.groups!["name"];
-    this.defaultValue = match.groups!["defaultValue"]?.substring(1).trim();
+
+    this.isNamed = options.isNamed || match.groups!["bracket"] === "{";
+    options.isNamed = this.isNamed && match.groups!["endBracket"] !== "{";
+    const isOptionalPositional =
+      options.isOptional || match.groups!["bracket"] === "[";
+    options.isOptional =
+      isOptionalPositional && match.groups!["endBracket"] !== "]";
+    this.isRequired = !!match[3] || (!this.isNamed && !isOptionalPositional);
+
+    this.type = match[4].trim();
+    this.name = match.groups!["name"]!;
+    this.defaultValue =
+      match.groups!["defaultValue"]?.substring(1).trim() ?? null;
   }
 }
 
@@ -242,7 +288,7 @@ export class DartFunction {
   //   "g"
   // );
   static functionRegExp = RegExp(
-    `(?:^|\\s)(static\\s+)?(?<returnType>${dartType}\\s+)?((?<get>get)\\s+${dartNameWithGenericsExtends}|(?<set>set\\s+)?${dartNameWithGenericsExtends}\\s*\\((?<params>${DartFunctionParam.parameterRegExp.source}*)\\))\\s*({|=>)`,
+    `(?:^|\\s)(static\\s+)?(?<returnType>${dartType}\\s+)?((?<get>get)\\s+(?<nameGet>${dartName})|(?<set>set\\s+)?(?<nameFunc>${dartNameWithGenericsExtends})\\s*\\((?<params>${DartFunctionParam.parameterRegExp.source}*)\\))\\s*({|=>)`,
     "g"
   );
 
@@ -250,28 +296,41 @@ export class DartFunction {
   isGetter: boolean;
   isSetter: boolean;
   name: string;
-  returnType: string | undefined;
+  returnType: string | null;
   params: Array<DartFunctionParam>;
-  dartClass: DartClass | undefined;
+  dartClass: DartClass | null;
+  generics: string | null;
 
-  constructor(
-    public match: RegExpMatchArray,
-    dartClass: DartClass | undefined
-  ) {
+  constructor(public match: RegExpMatchArray, dartClass: DartClass | null) {
     this.dartClass = dartClass;
     this.isStatic = !!match[1];
-    this.returnType = match.groups!["returnType"]?.trim();
-    if (this.returnType === "static") {
-      this.isStatic = true;
-      this.returnType = undefined;
-    }
     this.isGetter = !!match.groups!["get"];
     this.isSetter = !!match.groups!["set"];
-    this.name = match[10] ?? match[32];
+    this.returnType = match.groups!["returnType"]?.trim() ?? null;
+    if (this.returnType === "static") {
+      this.isStatic = true;
+      this.returnType = null;
+    } else if (this.returnType === "set") {
+      this.isSetter = true;
+      this.returnType = null;
+    }
+    this.name = (match.groups!["nameGet"] ?? match.groups!["nameFunc"])!;
+    const index = this.name.indexOf("<");
+    if (index !== -1) {
+      this.generics = this.name.substring(index).trim();
+      this.name = this.name.substring(0, index).trim();
+    } else {
+      this.generics = null;
+    }
+
+    const state: ParamPositionState = {
+      isNamed: false,
+      isOptional: false,
+    };
     this.params = [
       ...(match.groups!["params"] ?? "").matchAll(
         DartFunctionParam.parameterRegExp
       ),
-    ].map((p) => new DartFunctionParam(p, this));
+    ].map((p) => new DartFunctionParam(p, this, state));
   }
 }
