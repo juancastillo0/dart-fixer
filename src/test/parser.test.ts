@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { DartImports } from "../parser";
+import { DartImports, DartType } from "../parser";
 import { Bracket, getBrackets } from "../parser-utils";
 
 suite("Parser Test Suite", () => {
@@ -377,7 +377,7 @@ class B extends Other {
     required this.value,
   });
 
-    /// dmawop
+    /// comm
     const B.named({
     /// 
     required this.v = 3,
@@ -405,7 +405,6 @@ class B extends Other {
 
     const values = new DartImports(text);
 
-    // console.log(values.classes[0].constructors);
     const dartClass = values.classes[0];
     assert.deepStrictEqual(removeMatch(values.classes, ["bracket"]), [
       {
@@ -457,7 +456,7 @@ class B extends Other {
               },
             ],
           },
-          //   /// dmawop
+          //   /// comm
           //   const B.named({
           //     ///
           //     required this.v = 3,
@@ -618,6 +617,100 @@ class B extends Other {
         methods: [],
       },
     ]);
+  });
+
+  test("Dart Type", () => {
+    const typeMap1 = new DartType("Map< String, int?>");
+    assert.deepStrictEqual(removeMatch([typeMap1])[0], {
+      text: "Map<String,int?>",
+      name: "Map",
+      generics: [
+        {
+          text: "String",
+          name: "String",
+          generics: [],
+        },
+        {
+          text: "int?",
+          name: "int",
+          generics: [],
+        },
+      ],
+    });
+
+    const typeMap2 = new DartType(
+      "Map< List<List<DateTime>?>, List<Map<int?, P>>>?"
+    );
+    assert.strictEqual(typeMap2.isNullable, true);
+    assert.deepStrictEqual(removeMatch([typeMap2])[0], {
+      text: "Map<List<List<DateTime>?>,List<Map<int?,P>>>?",
+      name: "Map",
+      generics: [
+        {
+          text: "List<List<DateTime>?>",
+          name: "List",
+          generics: [
+            {
+              text: "List<DateTime>?",
+              name: "List",
+              generics: [
+                {
+                  text: "DateTime",
+                  name: "DateTime",
+                  generics: [],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          text: "List<Map<int?,P>>",
+          name: "List",
+          generics: [
+            {
+              text: "Map<int?,P>",
+              name: "Map",
+              generics: [
+                {
+                  text: "int?",
+                  name: "int",
+                  generics: [],
+                },
+                {
+                  text: "P",
+                  name: "P",
+                  generics: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const typeString = new DartType("String");
+    assert.strictEqual(typeString.isString, true);
+    assert.strictEqual(typeString.isNullable, false);
+    assert.deepStrictEqual(
+      { ...typeString },
+      {
+        text: "String",
+        name: "String",
+        generics: [],
+      }
+    );
+
+    const typeStringNull = new DartType("String?");
+    assert.strictEqual(typeStringNull.isString, true);
+    assert.strictEqual(typeStringNull.isNullable, true);
+    assert.deepStrictEqual(
+      { ...typeStringNull },
+      {
+        text: "String?",
+        name: "String",
+        generics: [],
+      }
+    );
   });
 });
 
