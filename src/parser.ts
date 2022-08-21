@@ -384,49 +384,80 @@ export class DartType {
     }
   }
 
+  get isNotGeneric(): boolean {
+    return this.generics.length === 0;
+  }
+
   get isNullable(): boolean {
     return this.text.endsWith("?");
   }
   get isPrimitive(): boolean {
     return this.isNum || this.isString || this.isBool || this.isNull;
   }
+  get isDynamicOrObject(): boolean {
+    return (
+      this.isNotGeneric && (this.name === "dynamic" || this.name === "Object")
+    );
+  }
   get isCollection(): boolean {
     return this.isList || this.isMap || this.isSet;
   }
+  get isJson(): boolean {
+    return (
+      this.isPrimitive ||
+      this.isDynamicOrObject ||
+      (this.isNotGeneric && (this.isMap || this.isList)) ||
+      (this.isMap &&
+        this.generics[0].text === "String" &&
+        this.generics[1].isJson) ||
+      (this.isList && this.generics[0].isJson)
+    );
+  }
 
   get isMap(): boolean {
-    return this.name === "Map";
+    return (
+      this.name === "Map" && (this.generics.length === 2 || this.isNotGeneric)
+    );
   }
   get isList(): boolean {
-    return this.name === "List";
+    return (
+      this.name === "List" && (this.generics.length === 1 || this.isNotGeneric)
+    );
   }
   get isSet(): boolean {
-    return this.name === "Set";
+    return (
+      this.name === "Set" && (this.generics.length === 1 || this.isNotGeneric)
+    );
   }
 
   get isDateTime(): boolean {
-    return this.name === "DateTime";
+    return this.name === "DateTime" && this.isNotGeneric;
   }
   get isDuration(): boolean {
-    return this.name === "Duration";
+    return this.name === "Duration" && this.isNotGeneric;
+  }
+  get isBigInt(): boolean {
+    return this.name === "BigInt" && this.isNotGeneric;
   }
 
   get isInt(): boolean {
-    return this.name === "int";
+    return this.name === "int" && this.isNotGeneric;
   }
   get isDouble(): boolean {
-    return this.name === "double";
+    return this.name === "double" && this.isNotGeneric;
   }
   get isNum(): boolean {
-    return this.name === "num" || this.isInt || this.isDouble;
+    return (
+      (this.name === "num" || this.isInt || this.isDouble) && this.isNotGeneric
+    );
   }
   get isString(): boolean {
-    return this.name === "String";
+    return this.name === "String" && this.isNotGeneric;
   }
   get isBool(): boolean {
-    return this.name === "bool";
+    return this.name === "bool" && this.isNotGeneric;
   }
   get isNull(): boolean {
-    return this.name === "Null";
+    return this.name === "Null" && this.isNotGeneric;
   }
 }
