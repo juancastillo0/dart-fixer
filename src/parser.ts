@@ -184,7 +184,7 @@ export interface DartParam {
 
 export class DartConstructorParam implements DartParam {
   static constructorParameterRegExp = RegExp(
-    `(\\s*(?<bracket>[{\\[])?\\s*(required\\s+)?(?<typeOrPrefix>${dartType}\\s|this\\.|super\\.)\\s*(?<name>${dartName})\\s*(?:=\\s*(?<defaultValue>${dartValue})\\s*)?,?\\s*(?<endBracket>[}\\]])?\\s*)`,
+    `(\\s*(?<bracket>[{\\[])?\\s*(required\\s+)?(?<type>${dartType}\\s+)?((?<prefix>this|super)\\s*\\.)?\\s*(?<name>${dartName})\\s*(?:=\\s*(?<defaultValue>${dartValue})\\s*)?,?\\s*(?<endBracket>[}\\]])?\\s*)`,
     "g"
   );
 
@@ -212,13 +212,13 @@ export class DartConstructorParam implements DartParam {
       isOptionalPositional && match.groups!["endBracket"] !== "]";
     this.isRequired = !!match[3] || (!this.isNamed && !isOptionalPositional);
 
-    const typeOrPrefix = match.groups!["typeOrPrefix"]!;
-    this.isThis = typeOrPrefix === "this.";
-    this.isSuper = typeOrPrefix === "super.";
+    const prefix = match.groups!["prefix"];
+    this.isThis = prefix === "this";
+    this.isSuper = prefix === "super";
     this.name = match.groups!["name"]!;
     this.defaultValue = match.groups!["defaultValue"]?.trim() ?? null;
-    if (!this.isThis && !this.isSuper) {
-      this.type = typeOrPrefix.trim();
+    if (match.groups!["type"]) {
+      this.type = match.groups!["type"].trim();
     } else {
       this.type =
         dartConstructor.dartClass.fields.find((v) => v.name === this.name)

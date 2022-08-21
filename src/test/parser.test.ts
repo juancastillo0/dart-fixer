@@ -360,6 +360,261 @@ String func(G<B?> d) {
       },
     ]);
   });
+
+  test("Dart Constructors", () => {
+    const text = `
+class B extends Other {
+  final int? v;
+  final String value;
+
+  B({
+    this.v = 3,
+    super.md = const [],
+    required this.value,
+  });
+
+    /// dmawop
+    const B.named({
+    /// 
+    required this.v = 3,
+    //
+    required List super.md 
+    ,
+    this.value = """dd""",
+  });
+
+  factory B.factNamed(
+    this.v, [
+    List<dynamic >? md,
+    String? value = null,
+    //
+  ]) => B(value: value ?? '');
+
+  const factory B.constFactNamed(
+    int this.v, [
+    super.md = const [],
+    required this.value,
+  ]) = BOther //
+  ;
+}
+  `;
+
+    const values = new DartImports(text);
+
+    // console.log(values.classes[0].constructors);
+    const dartClass = values.classes[0];
+    assert.deepStrictEqual(removeMatch(values.classes, ["bracket"]), [
+      {
+        isAbstract: false,
+        name: "B",
+        generics: null,
+        extendsBound: "Other",
+        constructors: [
+          // B({
+          //   this.v = 3,
+          //   super.md = const [],
+          //   required this.value,
+          // });
+          {
+            isConst: false,
+            isFactory: false,
+            name: null,
+            dartClass: dartClass,
+            params: [
+              {
+                isThis: true,
+                isSuper: false,
+                isRequired: false,
+                isNamed: true,
+                defaultValue: "3",
+                name: "v",
+                type: "int?",
+                dartConstructor: dartClass.constructors[0],
+              },
+              {
+                isThis: false,
+                isSuper: true,
+                isRequired: false,
+                isNamed: true,
+                defaultValue: "const []",
+                name: "md",
+                type: null,
+                dartConstructor: dartClass.constructors[0],
+              },
+              {
+                isThis: true,
+                isSuper: false,
+                isRequired: true,
+                isNamed: true,
+                defaultValue: null,
+                name: "value",
+                type: "String",
+                dartConstructor: dartClass.constructors[0],
+              },
+            ],
+          },
+          //   /// dmawop
+          //   const B.named({
+          //     ///
+          //     required this.v = 3,
+          //     //
+          //     required List super.md
+          //     ,
+          //     this.value = """dd""",
+          //   });
+          {
+            isConst: true,
+            isFactory: false,
+            name: "named",
+            dartClass: dartClass,
+            params: [
+              {
+                isThis: true,
+                isSuper: false,
+                isRequired: true,
+                isNamed: true,
+                defaultValue: "3",
+                name: "v",
+                type: "int?",
+                dartConstructor: dartClass.constructors[1],
+              },
+              {
+                isThis: false,
+                isSuper: true,
+                isRequired: true,
+                isNamed: true,
+                defaultValue: null,
+                name: "md",
+                type: "List",
+                dartConstructor: dartClass.constructors[1],
+              },
+              {
+                isThis: true,
+                isSuper: false,
+                isRequired: false,
+                isNamed: true,
+                // TODO: revert string content defaultValue: '"""dd"""',
+                defaultValue: '""',
+                name: "value",
+                type: "String",
+                dartConstructor: dartClass.constructors[1],
+              },
+            ],
+          },
+          //   factory B.factNamed(
+          //     this.v, [
+          //     List<dynamic >? md,
+          //     String? value = null,
+          //     //
+          //   ]) => B(value: value ?? '');
+          {
+            isConst: false,
+            isFactory: true,
+            name: "factNamed",
+            dartClass: dartClass,
+            params: [
+              {
+                isThis: true,
+                isSuper: false,
+                isRequired: true,
+                isNamed: false,
+                defaultValue: null,
+                name: "v",
+                type: "int?",
+                dartConstructor: dartClass.constructors[2],
+              },
+              {
+                isThis: false,
+                isSuper: false,
+                isRequired: false,
+                isNamed: false,
+                defaultValue: null,
+                name: "md",
+                type: "List<dynamic >?",
+                dartConstructor: dartClass.constructors[2],
+              },
+              {
+                isThis: false,
+                isSuper: false,
+                isRequired: false,
+                isNamed: false,
+                defaultValue: "null",
+                name: "value",
+                type: "String?",
+                dartConstructor: dartClass.constructors[2],
+              },
+            ],
+          },
+          //   const factory B.constFactNamed(
+          //     int this.v, [
+          //     super.md = const [],
+          //     required this.value,
+          //   ]) = BOther //
+          //   ;
+          // }
+          {
+            isConst: true,
+            isFactory: true,
+            name: "constFactNamed",
+            dartClass: dartClass,
+            params: [
+              {
+                isThis: true,
+                isSuper: false,
+                isRequired: true,
+                isNamed: false,
+                defaultValue: null,
+                name: "v",
+                type: "int",
+                dartConstructor: dartClass.constructors[3],
+              },
+              {
+                isThis: false,
+                isSuper: true,
+                isRequired: false,
+                isNamed: false,
+                defaultValue: "const []",
+                name: "md",
+                type: null,
+                dartConstructor: dartClass.constructors[3],
+              },
+              {
+                isThis: true,
+                isSuper: false,
+                isRequired: true,
+                isNamed: false,
+                defaultValue: null,
+                name: "value",
+                type: "String",
+                dartConstructor: dartClass.constructors[3],
+              },
+            ],
+          },
+        ],
+        fields: [
+          {
+            isStatic: false,
+            isFinal: true,
+            name: "v",
+            isVariable: false,
+            type: "int?",
+            defaultValue: null,
+            dartClass: values.classes[0],
+          },
+          {
+            isStatic: false,
+            isFinal: true,
+            name: "value",
+            isVariable: false,
+            type: "String",
+            defaultValue: null,
+            dartClass: values.classes[0],
+          },
+        ],
+        methods: [],
+      },
+    ]);
+  });
 });
 
 function removeMatch(
