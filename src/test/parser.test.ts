@@ -1,26 +1,30 @@
 import * as assert from "assert";
 import { DartImports } from "../parser";
-import { getBrackets } from "../parser-utils";
+import { Bracket, getBrackets } from "../parser-utils";
 
 suite("Parser Test Suite", () => {
   test("Brackets", () => {
-    const text = "{ ddaw noiaw () => ; { }}";
+    const text = "{ comment () => ; { }}";
     const brackets = getBrackets(text);
-    const expected = {
+    const expected: Bracket = {
       start: 0,
       end: text.length - 1,
       parent: undefined,
+      children: [],
     };
+    const expected2 = {
+      start: text.length - 4,
+      end: text.length - 2,
+      parent: expected,
+      children: [],
+    };
+    expected.children.push(expected2);
+
     assert.deepStrictEqual(brackets.brackets[0], expected);
     assert.deepStrictEqual(brackets.findBracket(0), expected);
     assert.deepStrictEqual(brackets.findBracket(text.length - 1), expected);
     assert.deepStrictEqual(brackets.findBracket(1), expected);
 
-    const expected2 = {
-      start: text.length - 4,
-      end: text.length - 2,
-      parent: expected,
-    };
     assert.deepStrictEqual(brackets.findBracket(text.length - 2), expected2);
   });
 
