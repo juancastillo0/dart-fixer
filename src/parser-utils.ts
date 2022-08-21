@@ -1,25 +1,39 @@
 export interface Bracket {
   start: number;
   end?: number;
-  // children: Array<Bracket>;
+  children: Array<Bracket>;
   parent?: Bracket;
 }
 
 export interface Brackets {
   brackets: Array<Bracket>;
+  bracketsNested: Array<Bracket>;
   findBracket: (index: number) => Bracket | undefined;
 }
 
-export const getBrackets = (text: string): Brackets => {
+export const getBrackets = (
+  text: string,
+  delimiters: { start: string; end: string } = { start: "{", end: "}" }
+): Brackets => {
   let currentBracket: Bracket | undefined;
   const brackets: Array<Bracket> = [];
-  for (const b of text.matchAll(RegExp("({|})", "g"))) {
-    if (b[1] === "{") {
+  const bracketsNested: Array<Bracket> = [];
+  for (const b of text.matchAll(
+    RegExp(`(${delimiters.start}|${delimiters.end})`, "g")
+  )) {
+    if (b[1] === delimiters.start) {
       currentBracket = {
         start: b.index!,
+        end: undefined,
         parent: currentBracket,
+        children: [],
       };
       brackets.push(currentBracket);
+      if (currentBracket.parent) {
+        currentBracket.parent.children.push(currentBracket);
+      } else {
+        bracketsNested.push(currentBracket);
+      }
     } else if (currentBracket) {
       currentBracket.end = b.index;
       currentBracket = currentBracket.parent;
@@ -59,6 +73,7 @@ export const getBrackets = (text: string): Brackets => {
 
   return {
     findBracket,
+    bracketsNested,
     brackets,
   };
 };
