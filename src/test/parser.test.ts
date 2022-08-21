@@ -362,7 +362,10 @@ String func(G<B?> d) {
   });
 });
 
-function removeMatch(values: Array<unknown>): Array<unknown> {
+function removeMatch(
+  values: Array<unknown>,
+  keysToRemove: Array<string> = []
+): Array<unknown> {
   return values.map((v) => {
     if (typeof v !== "object") {
       return v;
@@ -370,6 +373,10 @@ function removeMatch(values: Array<unknown>): Array<unknown> {
     const obj: Record<string, unknown> = { ...v };
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete obj["match"];
+    for (const key of keysToRemove) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete obj[key];
+    }
     for (const [key, value] of [...Object.entries(obj)]) {
       if (Array.isArray(value)) {
         obj[key] = removeMatch(value);
