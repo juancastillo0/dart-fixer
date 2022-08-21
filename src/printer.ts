@@ -1,21 +1,72 @@
-import { DartClass, DartConstructor, DartConstructorParam } from "./parser";
+import {
+  DartClass,
+  DartConstructor,
+  DartConstructorParam,
+  DartType,
+} from "./parser";
 
 export const generateFromJson = (dartConstructor: DartConstructor): string => {
   return `
 factory ${dartConstructor.dartClass.name}.fromJson(Map json) {
   return ${dartConstructor.dartClass.name}(
     ${dartConstructor.params
-      .map((p) => (p.isNamed ? `${p.name}:` : "") + ` ${castJsonValue(p)},`)
+      .map(
+        (p) =>
+          `${p.isNamed ? `${p.name}: ` : ""}${fromJsonValue({ param: p })},`
+      )
       .join("\n    ")}
   );  
 }
 `;
 };
 
-function castJsonValue(p: DartConstructorParam): string {
-  const cast = !p.type ? "" : ` as ${p.type}`;
-  return `json["${p.name}"]${cast}`;
-}
+const fromJsonValue = (
+  options:
+    | {
+        param?: null;
+        dartType: DartType | undefined;
+        getter: string;
+      }
+    | {
+        param: DartConstructorParam;
+        getter?: null;
+        dartType?: null;
+      }
+): string => {
+  const param = options.param;
+  const getter = options.getter ?? `json["${param!.name}"]`;
+  const pType = param?.type ?? "dynamic";
+  const dartType = options.dartType ?? new DartType(pType);
+  if (dartType.text === "dynamic" || dartType.text === "Object?") {
+    return getter;
+  }
+  const nullableCast = dartType.isNullable ? `${getter} == null ? null : ` : "";
+  if (dartType.isMap) {
+    return `${nullableCast}(${getter} as Map).map((k, v) => MapEntry(${fromJsonValue(
+      {
+        dartType: dartType.generics[0],
+        getter: "k",
+      }
+    )},${fromJsonValue({
+      dartType: dartType.generics[1],
+      getter: "v",
+    })}))`;
+  } else if (dartType.isList || dartType.isSet) {
+    return `${nullableCast}(${getter} as Iterable).map((v) => ${fromJsonValue({
+      dartType: dartType.generics[0],
+      getter: "v",
+    })}).to${dartType.name}()`;
+  } else if (dartType.isDateTime) {
+    return `${nullableCast}DateTime.parse(${getter} as String)`;
+  } else if (dartType.isDuration) {
+    return `${nullableCast}Duration(microseconds: ${getter} as int)`;
+  } else if (dartType.isBigInt) {
+    return `${nullableCast}BigInt.parse(${getter} as String)`;
+  } else if (dartType.isPrimitive || dartType.text === "Object") {
+    return `${getter} as ${dartType.text}`;
+  }
+  return `${dartType.name}.fromJson((${getter} as Map).cast())`;
+};
 
 export const generateToJson = (dartClass: DartClass): string => {
   return `
@@ -23,11 +74,47 @@ Map<String, Object?> toJson() {
   return {
     ${dartClass.fields
       .filter((p) => !p.isStatic)
-      .map((p) => `"${p.name}": ${p.name},`)
+      .map(
+        (p) =>
+          `"${p.name}": ${toJsonValue({
+            name: p.name,
+            dartType: p.type ? new DartType(p.type) : undefined,
+          })},`
+      )
       .join("\n    ")}
   };  
 }
 `;
+};
+
+const toJsonValue = (f: {
+  name: string;
+  dartType: DartType | undefined;
+}): string => {
+  const dartType = f.dartType;
+  if (!dartType || dartType.isJson) {
+    return f.name;
+  }
+  const questionMark = dartType.isNullable ? "?" : "";
+  const getter = `${f.name}${questionMark}`;
+  if (dartType.isMap) {
+    return `${getter}.map((k, v) => MapEntry(k.toString(), ${toJsonValue({
+      dartType: dartType.generics[1],
+      name: "v",
+    })}))`;
+  } else if (dartType.isList || dartType.isSet) {
+    return `${getter}.map((v) => ${toJsonValue({
+      dartType: dartType.generics[0],
+      name: "v",
+    })}).toList()`;
+  } else if (dartType.isDateTime) {
+    return `${getter}.toIso8601String()`;
+  } else if (dartType.isDuration) {
+    return `${getter}.inMicroseconds`;
+  } else if (dartType.isBigInt) {
+    return `${getter}.toString()`;
+  }
+  return f.name;
 };
 
 export const generateEquality = (dartClass: DartClass): string => {
