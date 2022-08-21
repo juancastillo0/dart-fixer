@@ -109,6 +109,7 @@ export class DartClass {
 
   isAbstract: boolean;
   name: string;
+  generics: string | null;
   extendsBound: string | null;
   constructors: Array<DartConstructor>;
   fields: Array<DartField>;
@@ -118,6 +119,7 @@ export class DartClass {
   constructor(public match: RegExpMatchArray, ctx: DartImports) {
     this.isAbstract = !!match[1];
     this.name = match[2];
+    this.generics = match[3]?.trim() ?? null;
     this.extendsBound = match.groups!["extends"]?.trim() ?? null;
 
     this.bracket = ctx.brackets.findBracket(match.index! + match[0].length)!;
@@ -135,7 +137,12 @@ export class DartClass {
 export class DartConstructor {
   static constructorRegExp = (className: string): RegExp =>
     RegExp(
-      `(const\\s+)?(factory\\s+)?\\s+${className}(\\s*\\.\\s*${dartName})?\\s*\\((?<params>${DartConstructorParam.constructorParameterRegExp.source}*)\\)`,
+      `(const\\s+)?(factory\\s+)?${className.replace(
+        "$",
+        "\\$"
+      )}(\\s*\\.\\s*${dartName})?\\s*\\((?<params>${
+        DartConstructorParam.constructorParameterRegExp.source
+      }*)\\)`,
       "g"
     );
 

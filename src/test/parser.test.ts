@@ -42,25 +42,88 @@ extends OtherG <T > {
 class Name4< WP  extends String?>{
 
 }
+
+class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __6Name_ {
+
+}
 `;
     const values = new DartImports(text);
-    const classesObjects = values.classes;
+    assert.deepStrictEqual(removeMatch(values.classes, ["bracket"]), [
+      {
+        isAbstract: false,
+        name: "Name",
+        generics: null,
+        extendsBound: null,
+        constructors: [],
+        fields: [],
+        methods: [],
+      },
+      // abstract class Name2 extends
+      // Other ///
+      // {}
+      {
+        isAbstract: true,
+        name: "Name2",
+        generics: null,
+        extendsBound: "Other",
+        constructors: [],
+        fields: [],
+        methods: [],
+      },
+      // class Name3<T> // comment
+      // extends OtherG <T > {
+      //  }
+      {
+        isAbstract: false,
+        name: "Name3",
+        generics: "<T>",
+        extendsBound: "OtherG <T >",
+        constructors: [],
+        fields: [],
+        methods: [],
+      },
+      // class Name4< WP  extends String?>{
 
-    const c1 = classesObjects[0];
-    assert.deepStrictEqual(c1.name, "Name");
+      // }
+      {
+        isAbstract: false,
+        name: "Name4",
+        generics: "< WP  extends String?>",
+        extendsBound: null,
+        constructors: [],
+        fields: [],
+        methods: [],
+      },
+      // class $N_ame5 extends Name4< Name3 <Name2>>{const $N_ame5();} abstract class __6Name_ {
 
-    const c2 = classesObjects[1];
-    assert.deepStrictEqual(c2.name, "Name2");
-    assert.deepStrictEqual(c2.extendsBound, "Other");
-    assert.deepStrictEqual(c2.isAbstract, true);
-
-    const c3 = classesObjects[2];
-    assert.deepStrictEqual(c3.name, "Name3");
-    assert.deepStrictEqual(c3.extendsBound, "OtherG <T >");
-
-    const c4 = classesObjects[3];
-    assert.deepStrictEqual(c4.name, "Name4");
-    assert.deepStrictEqual(c4.extendsBound, null);
+      // }
+      {
+        isAbstract: false,
+        name: "$N_ame5",
+        generics: null,
+        extendsBound: "Name4< Name3 <Name2>>",
+        constructors: [
+          {
+            isConst: true,
+            isFactory: false,
+            name: null,
+            params: [],
+            dartClass: values.classes[4],
+          },
+        ],
+        fields: [],
+        methods: [],
+      },
+      {
+        isAbstract: true,
+        name: "__6Name_",
+        generics: null,
+        extendsBound: null,
+        constructors: [],
+        fields: [],
+        methods: [],
+      },
+    ]);
   });
 
   test("Dart Function", () => {
@@ -107,8 +170,6 @@ String func(G<B?> d) {
 `;
 
     const values = new DartImports(text);
-    console.log(values);
-    // console.log(JSON.stringify(values, null, 2));
 
     const classes = values.classes;
     const bClass = classes[0];
