@@ -41,7 +41,7 @@ factory Model.fromJson(Map json) {
   return Model(
     v: json["v"] as int?,
     value: json["value"] as String,
-    params: json["params"] as List<String?>,
+    params: (json["params"] as Iterable).map((v) => v as String?).toList(),
   );  
 }
 `
