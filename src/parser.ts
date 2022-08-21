@@ -65,8 +65,11 @@ export class DartImports {
 // Dart Types and Identifiers
 
 const dartName = "([a-zA-Z_$][a-zA-Z0-9_$]*)";
-// TODO: nested generics
-const generics = `(\\s*<\\s*${dartName}\\??\\s*(,\\s*${dartName}\\??)*\\s*>\\s*)`;
+const _gen2 = `(?:\\s*<\\s*${dartName}\\s*(?:,\\s*${dartName})*\\s*>\\s*)`;
+const _dt2 = `(?:${dartName}${_gen2}?\\??)`;
+const _gen1 = `(?:\\s*<\\s*${_dt2}\\s*(?:,\\s*${_dt2})*\\s*>\\s*)`;
+const _dt1 = `(?:${dartName}${_gen1}?\\??)`;
+const generics = `(\\s*<\\s*${_dt1}\\s*(?:,\\s*${_dt1})*\\s*>\\s*)`;
 const dartType = `(${dartName}${generics}?\\??)`;
 const typeNameWithExtends = `(${dartName}(\\s+extends\\s+${dartType})?)`;
 const genericsWithExtends = `(\\s*<\\s*${typeNameWithExtends}\\s*(,\\s*${typeNameWithExtends})*\\s*>\\s*)`;
