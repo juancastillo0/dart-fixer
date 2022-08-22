@@ -100,10 +100,12 @@ export const binarySearch = <T>(
       min = mid + 1;
     }
   }
-  min = Math.max(min, max);
+  min = Math.min(array.length - 1, Math.max(min, max));
+  const index =
+    min <= 0 ? 0 : array[min] && compare(array[min]) < 0 ? min - 1 : min;
   return {
     item: undefined,
-    index: min <= 0 ? 0 : min - 1,
+    index,
   };
 };
 
@@ -134,7 +136,12 @@ export const cleanRawText = (
   text: string,
   regExps: Array<{ pattern: RegExp; replace: string }>
 ): CleanedText => {
-  const newLines = [...text.matchAll(/\n/g)].map((b) => b.index!);
+  const newLines = [
+    // TODO: maybe find a better way to find the first line "0, 0"
+    { index: 0 },
+    ...text.matchAll(/\n/g),
+  ].map((b) => b.index!);
+
   const combined = RegExp(
     regExps.map((r, i) => `(?<p${i}>${r.pattern.source})`).join("|"),
     "g"
@@ -145,12 +152,14 @@ export const cleanRawText = (
   const patternMatches: Array<MatchPosition> = [...text.matchAll(combined)].map(
     (v) => {
       const mIndex = v.index!;
-      const line = binarySearch(newLines, (index) => mIndex - index).index;
-      const currentCumulative = cumulative;
+
       cleaned.push(text.substring(textIndex, mIndex));
       textIndex = mIndex + v[0].length;
       const toReplace = regExps.find((_, i) => v.groups![`p${i}`])!.replace;
       cleaned.push(toReplace);
+
+      const line = binarySearch(newLines, (index) => mIndex - index).index;
+      const currentCumulative = cumulative;
       cumulative += v[0].length - toReplace.length;
 
       return {
@@ -158,7 +167,7 @@ export const cleanRawText = (
         index: mIndex,
         line,
         column: mIndex - newLines[line],
-        cumulative: currentCumulative,
+        cumulative,
         position: mIndex - currentCumulative,
       };
     }
@@ -170,11 +179,15 @@ export const cleanRawText = (
     if (patternMatches.length) {
       const match = binarySearch(patternMatches, (m) => index - m.position);
       const pattern = patternMatches[match.index];
-      delta = pattern.cumulative;
+      delta = pattern.position > index ? 0 : pattern.cumulative;
     }
     const mappedIndex = delta + index;
     const line = binarySearch(newLines, (index) => mappedIndex - index).index;
-    const column = mappedIndex - newLines[line];
+    const column = mappedIndex - newLines[line] - 1;
+    // TODO: maybe find a better way to find the first line "0, 0"
+    // if (mappedIndex > newLines[0]) {
+    //   line += 1;
+    // }
     return {
       column,
       index: mappedIndex,

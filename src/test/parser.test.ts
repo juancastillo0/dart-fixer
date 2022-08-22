@@ -28,6 +28,94 @@ suite("Parser Test Suite", () => {
     assert.deepStrictEqual(brackets.findBracket(text.length - 2), expected2);
   });
 
+  test("Clean Text", () => {
+    const text = `\
+import 'dart:convert';
+import 'dart:collection';
+
+import 'package:dart_fixer_test/other.dart';
+
+export
+
+    ///
+    'dart:async';
+
+export 'dart:io' //
+    hide
+        Directory;
+
+export 'dart:collection'
+    show
+        LinkedHashSet, //
+        HashSet;
+
+export 'dart:collection' //
+    show
+        HashMap;
+
+export 'dart:convert' show JsonCodec, Utf8Codec hide AsciiCodec;
+
+final str = '''
+String? func2() {
+}
+''';
+
+class B extends Other {
+  final int? v;
+  final String value;
+
+  B({
+    this.v = 3,
+    super.md = const [],
+    required this.value,
+  });
+
+  bool get isVNull => v == null;
+
+  int valueLength() => value.length;
+
+  static compare(B self) => self.isVNull;
+
+  static int? compareInt([B? self]) => self?.v;
+}`;
+
+    const values = new DartImports(text);
+    const dartClass = values.classes[0];
+    assert.deepStrictEqual(dartClass.bracket, {
+      start: 289,
+      end: 572,
+      children: [
+        {
+          start: 334,
+          end: 404,
+          parent: dartClass.bracket,
+          children: [],
+          originalStart: {
+            column: 4,
+            index: 488,
+            line: 34,
+          },
+          originalEnd: {
+            column: 2,
+            index: 558,
+            line: 38,
+          },
+        },
+      ],
+      parent: undefined,
+      originalStart: {
+        index: 443,
+        line: 30,
+        column: 22,
+      },
+      originalEnd: {
+        index: 726,
+        line: 47,
+        column: 0,
+      },
+    });
+  });
+
   test("Dart Class", () => {
     const text = `
 class ///
@@ -47,11 +135,106 @@ class Name4< WP  extends String?>{
 
 }
 
+final b = """
+  value values
+
+  po """;
+
 class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __6Name_ {
 
 }
 `;
     const values = new DartImports(text);
+
+    assert.deepStrictEqual(
+      values.cleanText.newLines,
+      [
+        // TODO: maybe find a better way to find the first line "0, 0"
+        0, 0, 10, 19, 20, 24, 25, 54, 65, 69, 70, 97, 119, 122, 123, 158, 159,
+        161, 162, 176, 191, 192, 202, 203, 292, 293, 295,
+      ]
+    );
+    const brackets = values.cleanText.brackets.brackets;
+    assert.deepStrictEqual(brackets[0], {
+      start: 15,
+      end: 20,
+      children: [],
+      parent: undefined,
+      originalStart: {
+        index: 18,
+        line: 2,
+        column: 7,
+      },
+      originalEnd: {
+        index: 23,
+        line: 4,
+        column: 2,
+      },
+    });
+    assert.deepStrictEqual(brackets[1], {
+      start: 61,
+      end: 62,
+      children: [],
+      parent: undefined,
+      originalStart: {
+        index: 67,
+        line: 8,
+        column: 1,
+      },
+      originalEnd: {
+        index: 68,
+        line: 8,
+        column: 2,
+      },
+    });
+    assert.deepStrictEqual(brackets[2], {
+      start: 102,
+      end: 105,
+      children: [],
+      parent: undefined,
+      originalStart: {
+        index: 118,
+        line: 11,
+        column: 20,
+      },
+      originalEnd: {
+        index: 121,
+        line: 12,
+        column: 1,
+      },
+    });
+    assert.deepStrictEqual(brackets[3], {
+      start: 141,
+      end: 144,
+      children: [],
+      parent: undefined,
+      originalStart: {
+        index: 157,
+        line: 14,
+        column: 33,
+      },
+      originalEnd: {
+        index: 160,
+        line: 16,
+        column: 0,
+      },
+    });
+    assert.deepStrictEqual(brackets[4], {
+      start: 205,
+      end: 223,
+      children: [],
+      parent: undefined,
+      originalStart: {
+        index: 247,
+        line: 23,
+        column: 43,
+      },
+      originalEnd: {
+        index: 265,
+        line: 23,
+        column: 61,
+      },
+    });
     assert.deepStrictEqual(removeMatch(values.classes, ["bracket"]), [
       {
         isAbstract: false,
