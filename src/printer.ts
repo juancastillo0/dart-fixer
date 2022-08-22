@@ -49,9 +49,8 @@ export const generate = (
       Object.assign(options, { [k]: v as object });
     }
   }
-  return `
-// generated-by-dart-fixer-start
-  ${options.fromJson ? generateFromJson(dartClass.constructors[0]) : ""}\
+  const output = `\
+  ${options.fromJson ? generateFromJson(dartClass.defaultConstructor) : ""}\
   ${options.toJson ? generateToJson(dartClass) : ""}\
   ${options.equality ? generateEquality(dartClass) : ""}\
   ${options.allFieldsGetter ? generateAllFieldsGetter(dartClass) : ""}\
@@ -59,7 +58,16 @@ export const generate = (
 
 ${options.allFieldsEnum ? generateAllFieldsEnum(dartClass) : ""}\
 ${options.builder ? generateBuilder(dartClass) : ""}\
-// generated-by-dart-fixer-end
+`;
+  const md5Hash = createHash("md5").update(output).digest("base64");
+  const data = JSON.stringify({
+    md5Hash,
+  });
+
+  return `
+// generated-dart-fixer-start${data}
+${output}
+// generated-dart-fixer-end
 `;
 };
 
