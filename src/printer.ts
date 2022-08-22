@@ -127,12 +127,12 @@ bool operator ==(Object? other) {
   ${dartClass.fields
     .filter((p) => !p.isStatic)
     .map((p) => ` && other.${p.name} == ${p.name}`)
-    .join("")}
-};
+    .join("")};
+}
 
 @override
 int get hashCode {
-  return Object.hasAll([
+  return Object.hashAll([
     runtimeType,
     ${dartClass.fields
       .filter((p) => !p.isStatic)
@@ -199,7 +199,7 @@ class ${className} {
   bool ${p.name}IsSet = false;
   ${typeNull} _${p.name};
   ${typeNull} get ${p.name} => _${p.name};
-  set ${p.name}(${type} newValue) {
+  set ${p.name}(${typeNull} newValue) {
     _${p.name} = newValue;
     ${p.name}IsSet = true;
   }

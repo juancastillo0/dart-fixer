@@ -72,12 +72,12 @@ Map<String, Object?> toJson() {
 @override
 bool operator ==(Object? other) {
   return identical(other, this) || other is Model && other.runtimeType == runtimeType
-   && other.v == v && other.value == value && other.params == params
-};
+   && other.v == v && other.value == value && other.params == params;
+}
 
 @override
 int get hashCode {
-  return Object.hasAll([
+  return Object.hashAll([
     runtimeType,
     v,
     value,
@@ -150,7 +150,7 @@ class ModelBuilder {
   bool valueIsSet = false;
   String? _value;
   String? get value => _value;
-  set value(String newValue) {
+  set value(String? newValue) {
     _value = newValue;
     valueIsSet = true;
   }
