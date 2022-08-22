@@ -7,6 +7,7 @@ import {
   DartImports,
   dartStringRegExp,
 } from "./parser";
+import { generate } from "./printer";
 
 const COMMAND = "dart-fixer.helloWorld";
 
@@ -75,23 +76,48 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
   };
 
   provideCodeActions(
-    document: vscode.TextDocument
-    // range: vscode.Range | vscode.Selection,
+    document: vscode.TextDocument,
+    range: vscode.Range | vscode.Selection
     // context: vscode.CodeActionContext,
     // token: vscode.CancellationToken
   ): Array<vscode.CodeAction> {
     const text = document.getText();
-    console.log(new DartImports(text));
+    const values = new DartImports(text);
+    console.log(values);
 
-    const action = new vscode.CodeAction(
-      "Fix Imports add",
-      vscode.CodeActionKind.QuickFix
-    );
-    action.edit = new vscode.WorkspaceEdit();
-    action.edit.insert(document.uri, new vscode.Position(0, 0), "class Z");
-    // action.diagnostics = [diagnostic];
-    action.isPreferred = true;
-    return [action, new DartFixImportsCodeAction()];
+    const actions: Array<vscode.CodeAction> = [new DartFixImportsCodeAction()];
+
+    for (const dartClass of values.classes) {
+      const originalStart = dartClass.bracket.originalStart;
+      const originalEnd = dartClass.bracket.originalEnd;
+      if (
+        !new vscode.Range(
+          originalStart.line,
+          originalStart.column,
+          originalEnd.line,
+          originalEnd.column
+        ).contains(range)
+      ) {
+        continue;
+      }
+      const action = new vscode.CodeAction(
+        "Generate Class Helpers",
+        vscode.CodeActionKind.QuickFix
+      );
+      const value = generate(dartClass, {});
+      const lastBracket = new vscode.Range(
+        originalEnd.line,
+        originalEnd.column,
+        originalEnd.line,
+        originalEnd.column + 1
+      );
+      action.edit = new vscode.WorkspaceEdit();
+      action.edit.replace(document.uri, lastBracket, value);
+      // action.diagnostics = [diagnostic];
+      action.isPreferred = true;
+      actions.push(action);
+    }
+    return actions;
   }
 
   // resolveCodeAction(
