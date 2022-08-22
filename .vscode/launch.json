@@ -30,6 +30,27 @@
 				"${workspaceFolder}/dist/**/*.js"
 			],
 			"preLaunchTask": "tasks: watch-tests"
+		},
+		{
+			"name": "mocha tests",
+            "type": "node",
+            "request": "launch",
+			"protocol": "inspector",
+            "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
+            "cwd": "${workspaceRoot}",
+            "stopOnEntry": false,
+            "internalConsoleOptions": "openOnSessionStart",
+            "openDebug": "openOnDebugBreak",
+            "sourceMaps": true,
+            "args": [
+				"--require",
+				"ts-node/register",
+				"${workspaceRoot}/src/test/**.test.ts",
+				"--no-timeouts",
+				"-u",
+				"tdd",
+				"--color"
+			]
 		}
 	]
 }
