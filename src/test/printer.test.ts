@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import { Test } from "mocha";
 import { DartImports } from "../parser";
 import {
   generateAllFieldsEnum,
@@ -8,6 +9,28 @@ import {
   generateFromJson,
   generateToJson,
 } from "../printer";
+
+export const testF = (name: string, func: () => unknown): Test => {
+  return test(name, () => {
+    console.log(`Running ${name}.`);
+    let intervals = 1;
+    const timer: NodeJS.Timer = setInterval(() => {
+      console.log(`Running ${name}. ${intervals * 2} seconds`);
+      intervals += 1;
+    }, 2000);
+    const result = func();
+    if (result instanceof Promise) {
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      result.then(() => {
+        clearInterval(timer);
+      });
+    } else {
+      clearInterval(timer);
+    }
+
+    return result;
+  });
+};
 
 suite("Parser Test Suite", () => {
   const text = `
@@ -42,7 +65,7 @@ factory Model.fromJson(Map json) {
     v: json["v"] as int?,
     value: json["value"] as String,
     params: (json["params"] as Iterable).map((v) => v as String?).toList(),
-  );  
+  );
 }
 `
     );
@@ -69,6 +92,18 @@ Map<String, Object?> toJson() {
     assert.equal(
       output,
       `
+Model copyWith({
+  int? v, bool vToNull = false,
+  String? value,
+  List<String?>? params,
+}) {
+  return Model(
+    v: v ?? (vToNull ? null : this.v),
+    value: value ?? this.value,
+    params: params ?? this.params,
+  );
+}
+
 @override
 bool operator ==(Object? other) {
   return identical(other, this) || other is Model && other.runtimeType == runtimeType
@@ -113,16 +148,26 @@ List<Object?> get allFields => [
       output,
       `
 enum ModelFields {
-  v("int?", true),
-  value("String", true),
-  params("List<String>?", true);
+  v("int?", isFinal: true, isVariable: false, defaultValue: null,),
+  value("String", isFinal: true, isVariable: false, defaultValue: null,),
+  params("List<String>?", isFinal: true, isVariable: false, defaultValue: null,);
 
   final String type;
   final bool isFinal;
+  final bool isVariable;
+  final Object? defaultValue;
 
   bool get isNullable => type.endsWith('?');
 
-  const ModelFields(this.type, this.isFinal);
+  Object? get(Model object) {
+    switch (this) {
+      case ModelFields.v: return object.v;
+      case ModelFields.value: return object.value;
+      case ModelFields.params: return object.params;
+    }
+  }
+
+  const ModelFields(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
 }
 `
     );
@@ -160,15 +205,30 @@ class ModelBuilder {
   }
 
   bool paramsIsSet = false;
-  List<String>? _params;
-  List<String>? get params => _params;
-  set params(List<String>? newValue) {
+  List<String?>? _params;
+  List<String?>? get params => _params;
+  set params(List<String?>? newValue) {
     _params = newValue;
     paramsIsSet = true;
   }
-  ModelBuilder paramsSet(List<String>? newValue) {
+  ModelBuilder paramsSet(List<String?> newValue) {
     params = newValue;
     return this;
+  }
+
+  bool get isValidValue {
+    return value != null && params != null;
+  }
+
+  Model? tryToValue() {
+    if (!isValidValue) {
+      return null;
+    }
+    return Model(
+      v: v,
+      value: value as String,
+      params: params as List<String?>,
+    );
   }
   
   ModelBuilder apply(ModelBuilder other) {

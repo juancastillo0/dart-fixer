@@ -1,7 +1,9 @@
+import { createHash } from "crypto";
 import {
   DartClass,
-  DartConstructor,
   DartConstructorParam,
+  DartConstructorSpec,
+  DartFieldOrParam,
   DartType,
 } from "./parser";
 
@@ -61,17 +63,18 @@ ${options.builder ? generateBuilder(dartClass) : ""}\
 `;
 };
 
-export const generateFromJson = (dartConstructor: DartConstructor): string => {
+export const generateFromJson = (
+  dartConstructor: DartConstructorSpec
+): string => {
   return `
 factory ${dartConstructor.dartClass.name}.fromJson(Map json) {
-  return ${dartConstructor.dartClass.name}(
-    ${dartConstructor.params
-      .map(
-        (p) =>
-          `${p.isNamed ? `${p.name}: ` : ""}${fromJsonValue({ param: p })},`
-      )
-      .join("\n    ")}
-  );  
+  return ${instantiateConstructor(
+    dartConstructor,
+    dartConstructor.params.map((p) => ({
+      name: p.name,
+      value: fromJsonValue({ param: p }),
+    }))
+  )};
 }
 `;
 };
@@ -128,8 +131,7 @@ export const generateToJson = (dartClass: DartClass): string => {
   return `
 Map<String, Object?> toJson() {
   return {
-    ${dartClass.fields
-      .filter((p) => !p.isStatic)
+    ${dartClass.fieldsNotStatic
       .map(
         (p) =>
           `"${p.name}": ${toJsonValue({
@@ -173,15 +175,70 @@ const toJsonValue = (f: {
   return f.name;
 };
 
+const instantiateConstructor = (
+  dartConstructor: DartConstructorSpec,
+  values: Array<{ name: string; value: string }>,
+  options?: {
+    delimiter?: string;
+  }
+): string => {
+  const fieldsMap = new Map(values.map((v) => [v.name, v.value]));
+  const constructorName = dartConstructor.name
+    ? `.${dartConstructor.name}`
+    : "";
+
+  const delimiter = options?.delimiter ?? "  ";
+
+  return `\
+${dartConstructor.dartClass.name}${constructorName}(
+  ${delimiter}${dartConstructor.params
+    .filter((p) => fieldsMap.has(p.name))
+    .map((p) => {
+      const value = fieldsMap.get(p.name)!;
+      fieldsMap.delete(p.name);
+      return `${p.isNamed ? `${p.name}: ` : ""}${value},`;
+    })
+    .join(`\n  ${delimiter}`)}
+${delimiter})${[...fieldsMap.entries()]
+    .map(([k, v]) => `..${k} = ${v}`)
+    .join(",\n")}`; // set non final fields
+};
+
 export const generateEquality = (dartClass: DartClass): string => {
+  const dartConstructor = dartClass.constructors[0];
   return `
+${dartClass.name} copyWith({
+  ${dartConstructor.params
+    .map(
+      (p) =>
+        `${nullableType(p.type)} ${p.name},${
+          p.type?.trim().endsWith("?") ? ` bool ${p.name}ToNull = false,` : ""
+        }`
+    )
+    .join("\n  ")}
+}) {
+  return ${instantiateConstructor(
+    dartConstructor,
+    dartConstructor.params.map((p) => ({
+      name: p.name,
+      value: `${p.name} ?? ${
+        p.type?.trim().endsWith("?")
+          ? `(${p.name}ToNull ? null : this.${p.name})`
+          : `this.${p.name}`
+      }`,
+    })),
+    {
+      delimiter: "  ",
+    }
+  )};
+}
+
 @override
 bool operator ==(Object? other) {
   return identical(other, this) || other is ${
     dartClass.name
   } && other.runtimeType == runtimeType
-  ${dartClass.fields
-    .filter((p) => !p.isStatic)
+  ${dartClass.fieldsNotStatic
     .map((p) => ` && other.${p.name} == ${p.name}`)
     .join("")};
 }
@@ -190,17 +247,13 @@ bool operator ==(Object? other) {
 int get hashCode {
   return Object.hashAll([
     runtimeType,
-    ${dartClass.fields
-      .filter((p) => !p.isStatic)
-      .map((p) => `${p.name},`)
-      .join("\n    ")}
+    ${dartClass.fieldsNotStatic.map((p) => `${p.name},`).join("\n    ")}
   ]);
 }
 
 @override
 String toString() {
-  return '${dartClass.name}(${dartClass.fields
-    .filter((p) => !p.isStatic)
+  return '${dartClass.name}(${dartClass.fieldsNotStatic
     .map((p) => `${p.name}:$${p.name},`)
     .join("")}${dartClass.methods
     .filter((p) => !p.isStatic && p.isGetter)
@@ -213,10 +266,7 @@ String toString() {
 export const generateAllFieldsGetter = (dartClass: DartClass): string => {
   return `
 List<Object?> get allFields => [
-  ${dartClass.fields
-    .filter((p) => !p.isStatic)
-    .map((p) => `${p.name},`)
-    .join("\n  ")}
+  ${dartClass.fieldsNotStatic.map((p) => `${p.name},`).join("\n  ")}
 ];
 `;
 };
@@ -224,17 +274,38 @@ List<Object?> get allFields => [
 export const generateAllFieldsEnum = (dartClass: DartClass): string => {
   return `
 enum ${dartClass.name}Fields {
-  ${dartClass.fields
-    .filter((p) => !p.isStatic)
-    .map((p) => `${p.name}("${p.type ?? ""}", ${p.isFinal.toString()})`)
+  ${dartClass.fieldsNotStatic
+    .map(
+      (p) =>
+        `${p.name}("${
+          p.type ?? ""
+        }", isFinal: ${p.isFinal.toString()}, isVariable: ${p.isVariable.toString()}, defaultValue: ${
+          p.defaultValue?.toString() ?? "null"
+        },)`
+    )
     .join(",\n  ")};
 
   final String type;
   final bool isFinal;
+  final bool isVariable;
+  final Object? defaultValue;
 
   bool get isNullable => type.endsWith('?');
 
-  const ${dartClass.name}Fields(this.type, this.isFinal);
+  Object? get(${dartClass.name} object) {
+    switch (this) {
+      ${dartClass.fieldsNotStatic
+        .map(
+          (p) =>
+            `case ${dartClass.name}Fields.${p.name}: return object.${p.name};`
+        )
+        .join("\n      ")}
+    }
+  }
+
+  const ${
+    dartClass.name
+  }Fields(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
 }
 `;
 };
@@ -243,11 +314,17 @@ const nullableType = (type: string | null): string =>
   `${!type?.endsWith("?") ? `${type ?? "Object"}?` : type}`;
 
 export const generateBuilder = (dartClass: DartClass): string => {
+  const dartConstructor = dartClass.defaultConstructor;
+  const fields: Array<DartFieldOrParam> =
+    dartConstructor?.params ??
+    dartClass.fields.filter((f) => !f.isStatic && !f.isFinal);
+  if (fields.length === 0) {
+    return "";
+  }
   const className = `${dartClass.name}Builder`;
   return `
 class ${className} {
-  ${dartClass.fields
-    .filter((p) => !p.isStatic)
+  ${fields
     .map((p) => {
       const type = p.type ?? "Object";
       const typeNull = nullableType(p.type);
@@ -265,10 +342,34 @@ class ${className} {
   }`;
     })
     .join("\n")}
+
+  bool get isValidValue {
+    return ${fields
+      .filter((p) => p.type && !p.type.trim().endsWith("?"))
+      .map((p) => `${p.name} != null`)
+      .join(" && ")};
+  }
+
+  ${dartClass.name}? tryToValue() {
+    if (!isValidValue) {
+      return null;
+    }
+    return ${instantiateConstructor(
+      dartConstructor,
+      fields.map((f) => ({
+        name: f.name,
+        value: `${f.name}${
+          !f.type || f.type.trim().endsWith("?") ? "" : ` as ${f.type}`
+        }`,
+      })),
+      {
+        delimiter: "    ",
+      }
+    )};
+  }
   
   ${className} apply(${className} other) {
-    ${dartClass.fields
-      .filter((p) => !p.isStatic)
+    ${fields
       .map(
         (p) =>
           `if (other.${p.name}IsSet){${p.name === "other" ? "this." : ""}${

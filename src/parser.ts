@@ -116,6 +116,12 @@ const _dv1 = `(?:${_dvPre(_dv2)}(?:\\((?:${_argument1}\\s*,?\\s*)*\\))?)`;
 const argument = `(${dartName}\\s*:\\s*)?${_dv1}`;
 const dartValue = `(${_dvPre(_dv1)}(?:\\((${argument}\\s*,?\\s*)*\\))?)`;
 
+export interface DartConstructorSpec {
+  name: string | null;
+  dartClass: DartClass;
+  params: Array<DartConstructorParam>;
+}
+
 export class DartClass {
   static classRegExp = RegExp(
     `(?:^|\\s)(abstract\\s+)?class\\s+${dartNameWithGenericsExtends}(?:\\s*extends\\s+(?<extends>${dartType}))?\\s*{`,
@@ -130,6 +136,20 @@ export class DartClass {
   fields: Array<DartField>;
   methods: Array<DartFunction> = [];
   bracket: BracketWithOriginal;
+
+  get fieldsNotStatic(): Array<DartField> {
+    return this.fields.filter((p) => !p.isStatic);
+  }
+
+  get defaultConstructor(): DartConstructorSpec {
+    return this.constructors.length === 0
+      ? {
+          dartClass: this,
+          name: null,
+          params: [],
+        }
+      : this.constructors[0];
+  }
 
   constructor(public match: RegExpMatchArray, ctx: DartImports) {
     this.isAbstract = !!match[1];
@@ -198,6 +218,12 @@ interface ParamPositionState {
   isNamed: boolean;
 }
 
+export interface DartFieldOrParam {
+  defaultValue: string | null;
+  name: string;
+  type: string | null;
+}
+
 export interface DartParam {
   isRequired: boolean;
   isNamed: boolean;
@@ -206,7 +232,7 @@ export interface DartParam {
   type: string | null;
 }
 
-export class DartConstructorParam implements DartParam {
+export class DartConstructorParam implements DartParam, DartFieldOrParam {
   static constructorParameterRegExp = RegExp(
     `(\\s*(?<bracket>[{\\[])?\\s*(required\\s+)?(?<type>${dartType}\\s+)?((?<prefix>this|super)\\s*\\.)?\\s*(?<name>${dartName})\\s*(?:=\\s*(?<defaultValue>${dartValue})\\s*)?,?\\s*(?<endBracket>[}\\]])?\\s*)`,
     "g"
@@ -251,7 +277,7 @@ export class DartConstructorParam implements DartParam {
   }
 }
 
-export class DartField {
+export class DartField implements DartFieldOrParam {
   static fieldRegExp = RegExp(
     `\\s+(static\\s+)?((final\\s+)?(?<type>${dartType})?|var)\\s+(?<name>${dartName})(?<defaultValue>=\\s*${dartValue})?\\s*;`,
     "g"
