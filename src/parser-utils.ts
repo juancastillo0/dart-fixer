@@ -48,22 +48,16 @@ export const getBrackets = (
     //   return brackets[brackets.length - 1].end
     // }
 
-    let min = 0;
-    let max = brackets.length - 1;
-    while (max - min > 1) {
-      const mid = Math.floor((min + max) / 2);
-      const b = brackets[mid];
-      if (b.start === index || b.end === index) {
-        return b;
-      } else if (b.start > index) {
-        max = mid;
-      } else {
-        min = mid;
-      }
+    const bracket = binarySearch(brackets, (b) =>
+      b.start === index || b.end === index ? 0 : index - b.start
+    );
+    if (bracket.item) {
+      return bracket.item;
     }
+    let max = bracket.index + 1;
     while (max >= 0) {
       const bracket = brackets[max];
-      if (bracket.start <= index && bracket.end! >= index) {
+      if (bracket && bracket.start <= index && bracket.end! >= index) {
         return bracket;
       }
       max -= 1;
@@ -75,5 +69,31 @@ export const getBrackets = (
     findBracket,
     bracketsNested,
     brackets,
+  };
+};
+
+export const binarySearch = <T>(
+  array: Array<T>,
+  compare: (a: T) => number
+): { index: number; item: T | undefined } => {
+  let min = 0;
+  let max = array.length;
+  let compareValue: number | undefined;
+  while (max > min) {
+    const mid = Math.floor((min + max) / 2);
+    const item = array[mid];
+    compareValue = compare(item);
+    if (compareValue === 0) {
+      return { item, index: mid };
+    } else if (compareValue < 0) {
+      max = mid - 1;
+    } else {
+      min = mid + 1;
+    }
+  }
+  min = Math.max(min, max);
+  return {
+    item: undefined,
+    index: min <= 0 ? 0 : min - 1,
   };
 };
