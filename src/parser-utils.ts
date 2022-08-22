@@ -5,16 +5,25 @@ export interface Bracket {
   parent?: Bracket;
 }
 
-export interface Brackets {
-  brackets: Array<Bracket>;
-  bracketsNested: Array<Bracket>;
-  findBracket: (index: number) => Bracket | undefined;
+export interface Brackets<B extends Bracket> {
+  brackets: Array<B>;
+  bracketsNested: Array<B>;
+  findBracket: (index: number) => B | undefined;
+}
+
+export interface BracketWithOriginal extends Bracket {
+  end: number;
+  originalStart: TextPosition;
+  originalEnd: TextPosition;
 }
 
 export const getBrackets = (
   text: string,
-  delimiters: { start: string; end: string } = { start: "{", end: "}" }
-): Brackets => {
+  options?: {
+    delimiters?: { start: string; end: string };
+  }
+): Brackets<Bracket> => {
+  const delimiters = options?.delimiters ?? { start: "{", end: "}" };
   let currentBracket: Bracket | undefined;
   const brackets: Array<Bracket> = [];
   const bracketsNested: Array<Bracket> = [];
@@ -95,5 +104,97 @@ export const binarySearch = <T>(
   return {
     item: undefined,
     index: min <= 0 ? 0 : min - 1,
+  };
+};
+
+export interface MatchPosition {
+  length: number;
+  index: number;
+  line: number;
+  column: number;
+  cumulative: number;
+  position: number;
+}
+
+export interface TextPosition {
+  index: number;
+  line: number;
+  column: number;
+}
+
+export interface CleanedText {
+  brackets: Brackets<BracketWithOriginal>;
+  newLines: Array<number>;
+  patternMatches: Array<MatchPosition>;
+  cleanText: string;
+  mapIndex: (index: number) => TextPosition;
+}
+
+export const cleanRawText = (
+  text: string,
+  regExps: Array<{ pattern: RegExp; replace: string }>
+): CleanedText => {
+  const newLines = [...text.matchAll(/\n/g)].map((b) => b.index!);
+  const combined = RegExp(
+    regExps.map((r, i) => `(?<p${i}>${r.pattern.source})`).join("|"),
+    "g"
+  );
+  const cleaned: Array<string> = [];
+  let textIndex = 0;
+  let cumulative = 0;
+  const patternMatches: Array<MatchPosition> = [...text.matchAll(combined)].map(
+    (v) => {
+      const mIndex = v.index!;
+      const line = binarySearch(newLines, (index) => mIndex - index).index;
+      const currentCumulative = cumulative;
+      cleaned.push(text.substring(textIndex, mIndex));
+      textIndex = mIndex + v[0].length;
+      const toReplace = regExps.find((_, i) => v.groups![`p${i}`])!.replace;
+      cleaned.push(toReplace);
+      cumulative += v[0].length - toReplace.length;
+
+      return {
+        length: v[0].length,
+        index: mIndex,
+        line,
+        column: mIndex - newLines[line],
+        cumulative: currentCumulative,
+        position: mIndex - currentCumulative,
+      };
+    }
+  );
+  cleaned.push(text.substring(textIndex));
+
+  const mapIndex = (index: number): TextPosition => {
+    let delta = 0;
+    if (patternMatches.length) {
+      const match = binarySearch(patternMatches, (m) => index - m.position);
+      const pattern = patternMatches[match.index];
+      delta = pattern.cumulative;
+    }
+    const mappedIndex = delta + index;
+    const line = binarySearch(newLines, (index) => mappedIndex - index).index;
+    const column = mappedIndex - newLines[line];
+    return {
+      column,
+      index: mappedIndex,
+      line,
+    };
+  };
+
+  const cleanText = cleaned.join("");
+  const brackets = getBrackets(cleanText);
+
+  brackets.brackets.forEach((b) => {
+    (b as BracketWithOriginal).originalStart = mapIndex(b.start);
+    (b as BracketWithOriginal).originalEnd = mapIndex(b.end!);
+  });
+
+  return {
+    brackets: brackets as Brackets<BracketWithOriginal>,
+    newLines,
+    patternMatches,
+    cleanText,
+    mapIndex,
   };
 };
