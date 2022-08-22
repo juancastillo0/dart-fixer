@@ -5,6 +5,62 @@ import {
   DartType,
 } from "./parser";
 
+export interface GenerationOptions {
+  fromJson?: {
+    constructorName?: string;
+    rawMap?: boolean;
+  };
+  toJson?: {
+    nested?: boolean;
+  };
+  equality?: {
+    deep?: boolean;
+    toStringGetters?: boolean;
+  };
+  allFieldsGetter?: {
+    name?: string;
+  };
+  allFieldsEnum?: {
+    suffix?: string;
+  };
+  builder?: {
+    suffix?: string;
+  };
+}
+
+const defaultGenerationOptions: GenerationOptions = {
+  fromJson: {},
+  toJson: {},
+  equality: {},
+  allFieldsGetter: {},
+  allFieldsEnum: {},
+  builder: {},
+};
+
+export const generate = (
+  dartClass: DartClass,
+  options: GenerationOptions
+): string => {
+  options = { ...options };
+  for (const [k, v] of Object.entries(defaultGenerationOptions)) {
+    if (!(k in options)) {
+      Object.assign(options, { [k]: v as object });
+    }
+  }
+  return `
+// generated-by-dart-fixer-start
+  ${options.fromJson ? generateFromJson(dartClass.constructors[0]) : ""}\
+  ${options.toJson ? generateToJson(dartClass) : ""}\
+  ${options.equality ? generateEquality(dartClass) : ""}\
+  ${options.allFieldsGetter ? generateAllFieldsGetter(dartClass) : ""}\
+}
+
+${options.allFieldsEnum ? generateAllFieldsEnum(dartClass) : ""}\
+${options.builder ? generateBuilder(dartClass) : ""}\
+// generated-by-dart-fixer-end
+`;
+};
+
 export const generateFromJson = (dartConstructor: DartConstructor): string => {
   return `
 factory ${dartConstructor.dartClass.name}.fromJson(Map json) {
