@@ -1,4 +1,10 @@
-import { Bracket, Brackets, getBrackets } from "./parser-utils";
+import {
+  Brackets,
+  BracketWithOriginal,
+  CleanedText,
+  cleanRawText,
+  getBrackets,
+} from "./parser-utils";
 
 interface RegExpMatchArray extends Array<string> {
   index?: number;
@@ -18,15 +24,20 @@ export class DartImports {
   readonly exports: Array<RegExpMatchArray> = [];
   readonly classes: Array<DartClass> = [];
   readonly functions: Array<DartFunction> = [];
-  readonly brackets: Brackets;
-  readonly cleanText: string;
+  readonly cleanText: CleanedText;
 
   constructor(text: string) {
-    this.cleanText = text
-      .replace(RegExp(dartStringRegExp, "g"), '""')
-      .replace(DartImports.commentRegExp, "");
-    this.brackets = getBrackets(this.cleanText);
-    const replaced = this.cleanText;
+    this.cleanText = cleanRawText(text, [
+      {
+        pattern: dartStringRegExp,
+        replace: '""',
+      },
+      {
+        pattern: DartImports.commentRegExp,
+        replace: "",
+      },
+    ]);
+    const replaced = this.cleanText.cleanText;
 
     this.imports.push(...replaced.matchAll(DartImports.importRegExp));
     this.exports.push(...replaced.matchAll(DartImports.exportRegExp));
@@ -56,9 +67,13 @@ export class DartImports {
     return this.imports.length > 0 || this.exports.length > 0;
   }
 
+  get brackets(): Brackets<BracketWithOriginal> {
+    return this.cleanText.brackets;
+  }
+
   textSection = (index: number): string => {
     const b = this.brackets.findBracket(index)!;
-    return this.cleanText.substring(b.start, b.end);
+    return this.cleanText.cleanText.substring(b.start, b.end);
   };
 }
 
@@ -114,7 +129,7 @@ export class DartClass {
   constructors: Array<DartConstructor>;
   fields: Array<DartField>;
   methods: Array<DartFunction> = [];
-  bracket: Bracket;
+  bracket: BracketWithOriginal;
 
   constructor(public match: RegExpMatchArray, ctx: DartImports) {
     this.isAbstract = !!match[1];
@@ -123,11 +138,20 @@ export class DartClass {
     this.extendsBound = match.groups!["extends"]?.trim() ?? null;
 
     this.bracket = ctx.brackets.findBracket(match.index! + match[0].length)!;
-    const text = ctx.cleanText.substring(this.bracket.start, this.bracket.end);
-
-    this.fields = [...text.matchAll(DartField.fieldRegExp)].map(
-      (c) => new DartField(c, this)
+    const text = ctx.cleanText.cleanText.substring(
+      this.bracket.start,
+      this.bracket.end
     );
+
+    this.fields = [...text.matchAll(DartField.fieldRegExp)]
+      /// TODO: test
+      /// Only fields defined in the class scope (between the brackets {})
+      .filter(
+        (f) =>
+          ctx.brackets.findBracket(this.bracket.start + f.index!) ===
+          this.bracket
+      )
+      .map((c) => new DartField(c, this));
     this.constructors = [
       ...text.matchAll(DartConstructor.constructorRegExp(this.name)),
     ].map((c) => new DartConstructor(c, this));
@@ -352,7 +376,9 @@ export class DartType {
 
   constructor(rawText: string) {
     this.text = rawText.replace(/\s/g, "");
-    const brackets = getBrackets(this.text, { start: "<", end: ">" });
+    const brackets = getBrackets(this.text, {
+      delimiters: { start: "<", end: ">" },
+    });
     const topLevel = brackets.bracketsNested[0];
     this.name = !topLevel
       ? this.isNullable
