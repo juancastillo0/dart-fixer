@@ -12,21 +12,21 @@ interface RegExpMatchArray extends Array<string> {
   groups?: Record<string, string | undefined>;
 }
 
+export interface DartParserConfig {
+  packageName?: string;
+}
+
 export class DartImports {
   static commentRegExp = /\/\/\/?[^\n]*/g;
-  static dartStringRegExp = /''/g;
-  static importRegExp =
-    /(?:^|\s)(import|export)\s*['"]([^'" ]*)['"]\s*(hide\s+[^;]*\s*)?(show\s+[^;]*\s*)?(as\s+[^;]*\s*)?;/g;
-  static exportRegExp =
-    /(?:^|\s)export\s*['"]([^'" ]*)['"]\s*(hide [^;]*)?\s*(show [^;]*)?;/g;
 
-  readonly imports: Array<RegExpMatchArray> = [];
-  readonly exports: Array<RegExpMatchArray> = [];
+  readonly imports: Array<DartImport> = [];
   readonly classes: Array<DartClass> = [];
   readonly functions: Array<DartFunction> = [];
   readonly cleanText: CleanedText;
+  readonly config: DartParserConfig;
 
-  constructor(text: string) {
+  constructor(text: string, config?: DartParserConfig) {
+    this.config = config ?? {};
     this.cleanText = cleanRawText(text, [
       {
         pattern: dartStringRegExp,
@@ -39,8 +39,11 @@ export class DartImports {
     ]);
     const replaced = this.cleanText.cleanText;
 
-    this.imports.push(...replaced.matchAll(DartImports.importRegExp));
-    this.exports.push(...replaced.matchAll(DartImports.exportRegExp));
+    this.imports.push(
+      ...[...replaced.matchAll(DartImport.importRegExp)].map(
+        (i) => new DartImport(i, this)
+      )
+    );
 
     this.classes.push(
       ...[...replaced.matchAll(DartClass.classRegExp)].map(
@@ -64,7 +67,7 @@ export class DartImports {
   }
 
   get hasImports(): boolean {
-    return this.imports.length > 0 || this.exports.length > 0;
+    return this.imports.length > 0;
   }
 
   get brackets(): Brackets<BracketWithOriginal> {
@@ -75,6 +78,74 @@ export class DartImports {
     const b = this.brackets.findBracket(index)!;
     return this.cleanText.cleanText.substring(b.start, b.end);
   };
+}
+
+export class DartImport {
+  static importCombinatorRegExp =
+    /((show|hide)\s+((?!(show|hide|as)[\s;])[\w$]+\s*,?\s*)+)/g;
+  static importRegExp = RegExp(
+    `(?:^|\\s)(import|export)\\s*['"]([^'" \\n\\r]*)['"]\\s*(as\\s+(?<as>[\\w$]+)\\s*)?(?<combinator>${DartImport.importCombinatorRegExp.source}*);`,
+    "g"
+  );
+
+  isExport: boolean;
+  hide: Array<string>;
+  show: Array<string>;
+  as: string | null;
+  path: string;
+  isOwnPackage: boolean;
+
+  isFromPackage = (packageName: string): boolean =>
+    this.path.startsWith(`package:${packageName}/`);
+
+  isRelative = (options?: { root?: boolean }): boolean =>
+    !this.isFromStandardLibrary &&
+    !this.path.startsWith(`package:`) &&
+    (!options?.root || this.path.startsWith(`/`));
+
+  get isFromStandardLibrary(): boolean {
+    return this.path.startsWith(`dart:`);
+  }
+
+  constructor(public match: RegExpMatchArray, ctx: DartImports) {
+    this.isExport = match[1] === "export";
+    const index = match[0].match(/'|"/)!.index! + match.index!;
+    if (match[2]) {
+      this.path = match[2];
+    } else {
+      const replacedPath = ctx.cleanText.patternMatchesByPosition.get(index)!;
+      this.path = replacedPath.text.substring(1, replacedPath.length - 1);
+    }
+    this.isOwnPackage =
+      (ctx.config?.packageName && this.isFromPackage(ctx.config.packageName)) ||
+      this.isRelative();
+    this.as = match.groups!["as"] ?? null;
+
+    const parseListGroup = (name: "hide" | "show"): Array<string> => {
+      const values = match.groups!["combinator"];
+      if (!values) {
+        return [];
+      }
+      const matches = [...values.matchAll(/(:?^|[\s"'])(?<type>hide|show)\s/g)];
+      const result: Array<string> = [];
+      let i = matches.length - 1;
+      while (i >= 0) {
+        const current = matches[i];
+        if (current.groups!["type"] === name) {
+          result.push(
+            ...values
+              .substring(current.index! + 5, matches[i + 1]?.index)
+              .split(",")
+              .map((v) => v.trim())
+          );
+        }
+        i -= 1;
+      }
+      return result;
+    };
+    this.hide = parseListGroup("hide");
+    this.show = parseListGroup("show");
+  }
 }
 
 // Dart Types and Identifiers

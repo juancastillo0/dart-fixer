@@ -116,6 +116,7 @@ export interface MatchPosition {
   column: number;
   cumulative: number;
   position: number;
+  text: string;
 }
 
 export interface TextPosition {
@@ -128,6 +129,7 @@ export interface CleanedText {
   brackets: Brackets<BracketWithOriginal>;
   newLines: Array<number>;
   patternMatches: Array<MatchPosition>;
+  patternMatchesByPosition: Map<number, MatchPosition>;
   cleanText: string;
   mapIndex: (index: number) => TextPosition;
 }
@@ -169,6 +171,7 @@ export const cleanRawText = (
         column: mIndex - newLines[line],
         cumulative,
         position: mIndex - currentCumulative,
+        text: v[0],
       };
     }
   );
@@ -209,5 +212,8 @@ export const cleanRawText = (
     patternMatches,
     cleanText,
     mapIndex,
+    patternMatchesByPosition: new Map(
+      patternMatches.map((p) => [p.position, p])
+    ),
   };
 };
