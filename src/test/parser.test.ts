@@ -28,12 +28,16 @@ suite("Parser Test Suite", () => {
     assert.deepStrictEqual(brackets.findBracket(text.length - 2), expected2);
   });
 
-  test("Clean Text", () => {
-    const text = `\
-import 'dart:convert';
+  const importsAndCommentsText = `\
+import 'dart:convert' as convert;
 import 'dart:collection';
 
 import 'package:dart_fixer_test/other.dart';
+/// Comment
+import '/other.dart' // other comment
+  as other   show Other ,showD;
+
+import './other.dart';
 
 export
 
@@ -79,41 +83,151 @@ class B extends Other {
   static int? compareInt([B? self]) => self?.v;
 }`;
 
-    const values = new DartImports(text);
+  test("Clean Text", () => {
+    const values = new DartImports(importsAndCommentsText);
     const dartClass = values.classes[0];
     assert.deepStrictEqual(dartClass.bracket, {
-      start: 289,
-      end: 572,
+      start: 356,
+      end: 639,
       children: [
         {
-          start: 334,
-          end: 404,
+          start: 401,
+          end: 471,
           parent: dartClass.bracket,
           children: [],
           originalStart: {
             column: 4,
-            index: 488,
-            line: 34,
+            index: 605,
+            line: 39,
           },
           originalEnd: {
             column: 2,
-            index: 558,
-            line: 38,
+            index: 675,
+            line: 43,
           },
         },
       ],
       parent: undefined,
       originalStart: {
-        index: 443,
-        line: 30,
+        index: 560,
+        line: 35,
         column: 22,
       },
       originalEnd: {
-        index: 726,
-        line: 47,
+        index: 843,
+        line: 52,
         column: 0,
       },
     });
+  });
+
+  test("Dart Import", () => {
+    const values = new DartImports(importsAndCommentsText, {
+      packageName: "dart_fixer_test",
+    });
+    assert.equal(values.imports[0].isFromStandardLibrary, true);
+    assert.equal(values.imports[1].isFromStandardLibrary, true);
+    assert.equal(values.imports[1].isFromPackage("dart_fixer_test"), false);
+
+    assert.equal(values.imports[2].isFromStandardLibrary, false);
+    assert.equal(values.imports[2].isFromPackage("dart_fixer_test"), true);
+    assert.equal(values.imports[2].isFromPackage("other_package"), false);
+
+    assert.equal(values.imports[3].isFromStandardLibrary, false);
+    assert.equal(values.imports[3].isRelative({ root: true }), true);
+    // TODO: improve API. maybe a "kind" or "variant" enum
+    assert.equal(values.imports[3].isRelative(), true);
+    assert.equal(values.imports[3].isFromPackage("dart_fixer_test"), false);
+
+    assert.equal(values.imports[4].isFromStandardLibrary, false);
+    assert.equal(values.imports[4].isRelative({ root: true }), false);
+    assert.equal(values.imports[4].isRelative({ root: false }), true);
+    assert.equal(values.imports[4].isFromPackage("dart_fixer_test"), false);
+
+    assert.deepStrictEqual(removeMatch(values.imports), [
+      {
+        as: "convert",
+        hide: [],
+        isExport: false,
+        path: "dart:convert",
+        show: [],
+        isOwnPackage: false,
+      },
+      {
+        as: null,
+        hide: [],
+        isExport: false,
+        path: "dart:collection",
+        show: [],
+        isOwnPackage: false,
+      },
+      {
+        as: null,
+        hide: [],
+        isExport: false,
+        path: "package:dart_fixer_test/other.dart",
+        show: [],
+        isOwnPackage: true,
+      },
+      // import '/other.dart' // other comment
+      // as other   show Other ,showD;
+      {
+        as: "other",
+        hide: [],
+        isExport: false,
+        path: "/other.dart",
+        show: ["Other", "showD"],
+        isOwnPackage: true,
+      },
+      {
+        as: null,
+        hide: [],
+        isExport: false,
+        path: "./other.dart",
+        show: [],
+        isOwnPackage: true,
+      },
+      {
+        as: null,
+        hide: [],
+        isExport: true,
+        path: "dart:async",
+        show: [],
+        isOwnPackage: false,
+      },
+      {
+        as: null,
+        hide: ["Directory"],
+        isExport: true,
+        path: "dart:io",
+        show: [],
+        isOwnPackage: false,
+      },
+      {
+        as: null,
+        hide: [],
+        isExport: true,
+        path: "dart:collection",
+        show: ["LinkedHashSet", "HashSet"],
+        isOwnPackage: false,
+      },
+      {
+        as: null,
+        hide: [],
+        isExport: true,
+        path: "dart:collection",
+        show: ["HashMap"],
+        isOwnPackage: false,
+      },
+      {
+        as: null,
+        hide: ["AsciiCodec"],
+        isExport: true,
+        path: "dart:convert",
+        show: ["JsonCodec", "Utf8Codec"],
+        isOwnPackage: false,
+      },
+    ]);
   });
 
   test("Dart Class", () => {
@@ -915,6 +1029,9 @@ function removeMatch(
     for (const [key, value] of [...Object.entries(obj)]) {
       if (Array.isArray(value)) {
         obj[key] = removeMatch(value);
+      } else if (typeof value === "function") {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete obj[key];
       }
     }
     return obj;
