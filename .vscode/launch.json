@@ -35,12 +35,11 @@
 			"name": "mocha tests",
             "type": "node",
             "request": "launch",
-			"protocol": "inspector",
+			"runtimeVersion": "16.15.1",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
             "cwd": "${workspaceRoot}",
             "stopOnEntry": false,
             "internalConsoleOptions": "openOnSessionStart",
-            "openDebug": "openOnDebugBreak",
             "sourceMaps": true,
             "args": [
 				"--require",
