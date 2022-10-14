@@ -16,6 +16,13 @@ export interface DartParserConfig {
   packageName?: string;
 }
 
+export interface DartImportsData {
+  imports: Array<DartImport>;
+  classes: Array<DartClass>;
+  functions: Array<DartFunction>;
+  cleanText: CleanedText;
+}
+
 export class DartImports {
   static commentRegExp = /\/\/\/?[^\n]*/g;
 
@@ -25,45 +32,54 @@ export class DartImports {
   readonly cleanText: CleanedText;
   readonly config: DartParserConfig;
 
-  constructor(text: string, config?: DartParserConfig) {
+  constructor(text: string | DartImportsData, config?: DartParserConfig) {
     this.config = config ?? {};
-    this.cleanText = cleanRawText(text, [
-      {
-        pattern: dartStringRegExp,
-        replace: '""',
-      },
-      {
-        pattern: DartImports.commentRegExp,
-        replace: "",
-      },
-    ]);
-    const replaced = this.cleanText.cleanText;
+    if (typeof text === "string") {
+      this.cleanText = cleanRawText(text, [
+        {
+          pattern: dartStringRegExp,
+          replace: '""',
+        },
+        {
+          pattern: DartImports.commentRegExp,
+          replace: "",
+        },
+      ]);
+      const replaced = this.cleanText.cleanText;
 
-    this.imports.push(
-      ...[...replaced.matchAll(DartImport.importRegExp)].map(
-        (i) => new DartImport(i, this)
-      )
-    );
+      this.imports.push(
+        ...[...replaced.matchAll(DartImport.importRegExp)].map(
+          (i) => new DartImport({ match: i, ctx: this })
+        )
+      );
 
-    this.classes.push(
-      ...[...replaced.matchAll(DartClass.classRegExp)].map(
-        (c) => new DartClass({ match: c, ctx: this })
-      )
-    );
-    const classesBrackets = new Map(
-      this.classes.map((c) => [c.bracket.start, c])
-    );
-    this.functions.push(
-      ...[...replaced.matchAll(DartFunction.functionRegExp)].map((f) => {
-        const fBracket = this.brackets.findBracket(f.index!);
-        const dartClass = fBracket ? classesBrackets.get(fBracket.start) : null;
-        const func = new DartFunction(f, dartClass ?? null);
-        if (dartClass) {
-          dartClass.methods.push(func);
-        }
-        return func;
-      })
-    );
+      this.classes.push(
+        ...[...replaced.matchAll(DartClass.classRegExp)].map(
+          (c) => new DartClass({ match: c, ctx: this })
+        )
+      );
+      const classesBrackets = new Map(
+        this.classes.map((c) => [c.bracket.start, c])
+      );
+      this.functions.push(
+        ...[...replaced.matchAll(DartFunction.functionRegExp)].map((f) => {
+          const fBracket = this.brackets.findBracket(f.index!);
+          const dartClass = fBracket
+            ? classesBrackets.get(fBracket.start)
+            : null;
+          const func = new DartFunction(f, dartClass ?? null);
+          if (dartClass) {
+            dartClass.methods.push(func);
+          }
+          return func;
+        })
+      );
+    } else {
+      this.imports = text.imports;
+      this.classes = text.classes;
+      this.functions = text.functions;
+      this.cleanText = text.cleanText;
+    }
   }
 
   get hasImports(): boolean {
@@ -80,6 +96,15 @@ export class DartImports {
   };
 }
 
+export interface DartImportData {
+  isExport: boolean;
+  hide: Array<string>;
+  show: Array<string>;
+  as: string | null;
+  path: string;
+  isOwnPackage: boolean;
+}
+
 export class DartImport {
   static importCombinatorRegExp =
     /((show|hide)\s+((?!(show|hide|as)[\s;])[\w$]+\s*,?\s*)+)/g;
@@ -94,6 +119,7 @@ export class DartImport {
   as: string | null;
   path: string;
   isOwnPackage: boolean;
+  match: RegExpMatchArray | null;
 
   isFromPackage = (packageName: string): boolean =>
     this.path.startsWith(`package:${packageName}/`);
@@ -107,44 +133,61 @@ export class DartImport {
     return this.path.startsWith(`dart:`);
   }
 
-  constructor(public match: RegExpMatchArray, ctx: DartImports) {
-    this.isExport = match[1] === "export";
-    const index = match[0].match(/'|"/)!.index! + match.index!;
-    if (match[2]) {
-      this.path = match[2];
-    } else {
-      const replacedPath = ctx.cleanText.patternMatchesByPosition.get(index)!;
-      this.path = replacedPath.text.substring(1, replacedPath.length - 1);
-    }
-    this.isOwnPackage =
-      (ctx.config?.packageName && this.isFromPackage(ctx.config.packageName)) ||
-      this.isRelative();
-    this.as = match.groups!["as"] ?? null;
+  constructor(
+    params: { match: RegExpMatchArray; ctx: DartImports } | DartImportData
+  ) {
+    if ("match" in params) {
+      const { match, ctx } = params;
+      this.match = match;
+      this.isExport = match[1] === "export";
+      const index = match[0].match(/'|"/)!.index! + match.index!;
+      if (match[2]) {
+        this.path = match[2];
+      } else {
+        const replacedPath = ctx.cleanText.patternMatchesByPosition.get(index)!;
+        this.path = replacedPath.text.substring(1, replacedPath.length - 1);
+      }
+      this.isOwnPackage =
+        (ctx.config?.packageName &&
+          this.isFromPackage(ctx.config.packageName)) ||
+        this.isRelative();
+      this.as = match.groups!["as"] ?? null;
 
-    const parseListGroup = (name: "hide" | "show"): Array<string> => {
-      const values = match.groups!["combinator"];
-      if (!values) {
-        return [];
-      }
-      const matches = [...values.matchAll(/(:?^|[\s"'])(?<type>hide|show)\s/g)];
-      const result: Array<string> = [];
-      let i = matches.length - 1;
-      while (i >= 0) {
-        const current = matches[i];
-        if (current.groups!["type"] === name) {
-          result.push(
-            ...values
-              .substring(current.index! + 5, matches[i + 1]?.index)
-              .split(",")
-              .map((v) => v.trim())
-          );
+      const parseListGroup = (name: "hide" | "show"): Array<string> => {
+        const values = match.groups!["combinator"];
+        if (!values) {
+          return [];
         }
-        i -= 1;
-      }
-      return result;
-    };
-    this.hide = parseListGroup("hide");
-    this.show = parseListGroup("show");
+        const matches = [
+          ...values.matchAll(/(:?^|[\s"'])(?<type>hide|show)\s/g),
+        ];
+        const result: Array<string> = [];
+        let i = matches.length - 1;
+        while (i >= 0) {
+          const current = matches[i];
+          if (current.groups!["type"] === name) {
+            result.push(
+              ...values
+                .substring(current.index! + 5, matches[i + 1]?.index)
+                .split(",")
+                .map((v) => v.trim())
+            );
+          }
+          i -= 1;
+        }
+        return result;
+      };
+      this.hide = parseListGroup("hide");
+      this.show = parseListGroup("show");
+    } else {
+      this.match = null;
+      this.isExport = params.isExport;
+      this.hide = params.hide;
+      this.show = params.show;
+      this.as = params.as;
+      this.path = params.path;
+      this.isOwnPackage = params.isOwnPackage;
+    }
   }
 }
 

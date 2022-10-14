@@ -32,7 +32,7 @@ export const testF = (name: string, func: () => unknown): Test => {
   });
 };
 
-suite("Parser Test Suite", () => {
+suite("Printer Test Suite", () => {
   const text = `
 class Model {
 final int? v;
