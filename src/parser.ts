@@ -21,14 +21,25 @@ export interface DartImportsData {
   classes: Array<DartClass>;
   functions: Array<DartFunction>;
   cleanText: CleanedText;
+  enums: Array<DartEnum>;
+  mixins: Array<DartMixin>;
+  extensions: Array<DartExtension>;
+  fields: Array<DartField>;
+  typeAliases: Array<TypeAlias>;
 }
 
-export class DartImports {
+export class DartImports implements DartImportsData {
   static commentRegExp = /\/\/\/?[^\n]*/g;
 
-  readonly imports: Array<DartImport> = [];
-  readonly classes: Array<DartClass> = [];
-  readonly functions: Array<DartFunction> = [];
+  readonly imports: Array<DartImport>;
+  readonly classes: Array<DartClass>;
+  readonly functions: Array<DartFunction>;
+  readonly enums: Array<DartEnum>;
+  readonly mixins: Array<DartMixin>;
+  readonly extensions: Array<DartExtension>;
+  readonly fields: Array<DartField>;
+  readonly typeAliases: Array<TypeAlias>;
+
   readonly cleanText: CleanedText;
   readonly config: DartParserConfig;
 
@@ -47,22 +58,18 @@ export class DartImports {
       ]);
       const replaced = this.cleanText.cleanText;
 
-      this.imports.push(
-        ...[...replaced.matchAll(DartImport.importRegExp)].map(
-          (i) => new DartImport({ match: i, ctx: this })
-        )
+      this.imports = [...replaced.matchAll(DartImport.importRegExp)].map(
+        (i) => new DartImport({ match: i, ctx: this }, this.config)
       );
 
-      this.classes.push(
-        ...[...replaced.matchAll(DartClass.classRegExp)].map(
-          (c) => new DartClass({ match: c, ctx: this })
-        )
+      this.classes = [...replaced.matchAll(DartClass.classRegExp)].map(
+        (c) => new DartClass({ match: c, ctx: this })
       );
       const classesBrackets = new Map(
         this.classes.map((c) => [c.bracket.start, c])
       );
-      this.functions.push(
-        ...[...replaced.matchAll(DartFunction.functionRegExp)].map((f) => {
+      this.functions = [...replaced.matchAll(DartFunction.functionRegExp)].map(
+        (f) => {
           const fBracket = this.brackets.findBracket(f.index!);
           const dartClass = fBracket
             ? classesBrackets.get(fBracket.start)
@@ -72,13 +79,24 @@ export class DartImports {
             dartClass.methods.push(func);
           }
           return func;
-        })
+        }
       );
+      // TODO:
+      this.enums = [];
+      this.mixins = [];
+      this.extensions = [];
+      this.fields = [];
+      this.typeAliases = [];
     } else {
       this.imports = text.imports;
       this.classes = text.classes;
       this.functions = text.functions;
       this.cleanText = text.cleanText;
+      this.enums = text.enums;
+      this.mixins = text.mixins;
+      this.extensions = text.extensions;
+      this.fields = text.fields;
+      this.typeAliases = text.typeAliases;
     }
   }
 
@@ -102,7 +120,6 @@ export interface DartImportData {
   show: Array<string>;
   as: string | null;
   path: string;
-  isOwnPackage: boolean;
 }
 
 export class DartImport {
@@ -134,7 +151,8 @@ export class DartImport {
   }
 
   constructor(
-    params: { match: RegExpMatchArray; ctx: DartImports } | DartImportData
+    params: { match: RegExpMatchArray; ctx: DartImports } | DartImportData,
+    config: DartParserConfig | undefined
   ) {
     if ("match" in params) {
       const { match, ctx } = params;
@@ -147,10 +165,6 @@ export class DartImport {
         const replacedPath = ctx.cleanText.patternMatchesByPosition.get(index)!;
         this.path = replacedPath.text.substring(1, replacedPath.length - 1);
       }
-      this.isOwnPackage =
-        (ctx.config?.packageName &&
-          this.isFromPackage(ctx.config.packageName)) ||
-        this.isRelative();
       this.as = match.groups!["as"] ?? null;
 
       const parseListGroup = (name: "hide" | "show"): Array<string> => {
@@ -186,8 +200,10 @@ export class DartImport {
       this.show = params.show;
       this.as = params.as;
       this.path = params.path;
-      this.isOwnPackage = params.isOwnPackage;
     }
+    this.isOwnPackage =
+      (config?.packageName && this.isFromPackage(config.packageName)) ||
+      this.isRelative();
   }
 }
 
@@ -232,7 +248,7 @@ const dartValue = `(${_dvPre(_dv1)}(?:\\((${argument}\\s*,?\\s*)*\\))?)`;
 
 export interface DartConstructorSpec {
   name: string | null;
-  dartClass: DartClass;
+  dartClass: DartClass | DartEnum;
   params: Array<DartConstructorParam>;
 }
 
@@ -241,6 +257,8 @@ export interface DartClassData {
   name: string;
   generics: string | null;
   extendsBound: string | null;
+  interfaces: Array<string>;
+  mixins: Array<string>;
   constructors: Array<DartConstructor>;
   fields: Array<DartField>;
   methods: Array<DartFunction>;
@@ -258,6 +276,8 @@ export class DartClass implements DartClassData {
   name: string;
   generics: string | null;
   extendsBound: string | null;
+  interfaces: Array<string>;
+  mixins: Array<string>;
   constructors: Array<DartConstructor>;
   fields: Array<DartField>;
   methods: Array<DartFunction> = [];
@@ -286,6 +306,9 @@ export class DartClass implements DartClassData {
       this.isAbstract = !!match[1];
       this.name = match[2];
       this.generics = match[3]?.trim() ?? null;
+      // TODO:
+      this.interfaces = [];
+      this.mixins = [];
       this.extendsBound = match.groups!["extends"]?.trim() ?? null;
 
       this.bracket = ctx.brackets.findBracket(match.index! + match[0].length)!;
@@ -316,16 +339,65 @@ export class DartClass implements DartClassData {
       this.fields = opts.fields;
       this.methods = opts.methods;
       this.bracket = opts.bracket;
+      this.interfaces = opts.interfaces;
+      this.mixins = opts.mixins;
     }
   }
 }
 
-export interface DartConstructorData {
+export type DartTypeScope = DartClass | DartMixin | DartEnum | DartExtension;
+
+export interface DartMixin {
+  name: string;
+  generics: string | null;
+  on: Array<string>;
+  interfaces: Array<string>;
+  fields: Array<DartField>;
+  methods: Array<DartFunction>;
+}
+
+export interface DartExtension {
+  name: string | null;
+  generics: string | null;
+  on: string;
+  fields: Array<DartField>;
+  methods: Array<DartFunction>;
+}
+
+export interface DartEnum {
+  name: string;
+  generics: string | null;
+  constructors: Array<DartConstructor>;
+  interfaces: Array<string>;
+  mixins: Array<string>;
+  entries: Array<DartEnumEntry>;
+  fields: Array<DartField>;
+  methods: Array<DartFunction>;
+}
+
+export interface DartEnumEntry {
+  name: string;
+  generics: string | null;
+  arguments: Array<DartArgument>;
+}
+
+export interface DartArgument {
+  name: string | null;
+  value: string;
+}
+
+export interface TypeAlias {
+  name: string;
+  generics: string | null;
+  type: string;
+}
+
+export interface DartConstructorData extends DartConstructorSpec {
   isConst: boolean;
   isFactory: boolean;
   name: string | null;
   params: Array<DartConstructorParam>;
-  dartClass: DartClass;
+  dartClass: DartClass | DartEnum;
 }
 
 export class DartConstructor implements DartConstructorData {
@@ -345,11 +417,11 @@ export class DartConstructor implements DartConstructorData {
   isFactory: boolean;
   name: string | null;
   params: Array<DartConstructorParam>;
-  dartClass: DartClass;
+  dartClass: DartClass | DartEnum;
 
   constructor(
     match: RegExpMatchArray | DartConstructorData,
-    dartClass: DartClass
+    dartClass: DartClass | DartEnum
   ) {
     this.dartClass = dartClass;
     if (Array.isArray(match)) {
@@ -496,11 +568,11 @@ export class DartField implements DartFieldOrParam {
   isVariable: boolean;
   type: string | null;
   defaultValue: string | null;
-  dartClass: DartClass;
+  dartClass: DartTypeScope | null;
 
   constructor(
     public match: RegExpMatchArray | DartFieldData,
-    dartClass: DartClass
+    dartClass: DartTypeScope | null
   ) {
     this.dartClass = dartClass;
     if (Array.isArray(match)) {
@@ -603,13 +675,13 @@ export class DartFunction implements DartFunctionData {
   name: string;
   returnType: string | null;
   params: Array<DartFunctionParam>;
-  dartClass: DartClass | null;
+  dartClass: DartTypeScope | null;
   generics: string | null;
   match: RegExpMatchArray | undefined;
 
   constructor(
     match: RegExpMatchArray | DartFunctionData,
-    dartClass: DartClass | null
+    dartClass: DartTypeScope | null
   ) {
     this.dartClass = dartClass;
     if (Array.isArray(match)) {
