@@ -33,6 +33,10 @@ import {
   ExtensionDeclarationContext,
   MixinDeclarationContext,
   TypeNotVoidNotFunctionContext,
+  DeclarationContext,
+  SingleStringWithoutInterpolationContext,
+  SingleLineStringContext,
+  MultiLineStringContext,
 } from "../antlr/generated-antlr/DartParser";
 import { DartLexer } from "../antlr/generated-antlr/DartLexer";
 import {
@@ -45,19 +49,21 @@ import {
   DartClassData,
   DartConstructor,
   DartConstructorParam,
+  DartEnum,
+  DartEnumEntry,
+  DartExtension,
   DartField,
   DartFunction,
   DartFunctionParam,
   DartImport,
   DartImports,
+  DartMixin,
+  DartParserConfig,
+  DartTypeScope,
+  TypeAlias,
 } from "../parser";
 import { Interval } from "antlr4ts/misc/Interval";
-
-const flatMap = <T>(list: Array<Array<T>>): Array<T> => {
-  const result: Array<T> = [];
-  list.forEach((l) => result.push(...l));
-  return result;
-};
+import { cleanRawText } from "../parser-utils";
 
 export interface ParseCtx {
   inputStream: ANTLRInputStream;
@@ -66,7 +72,9 @@ export interface ParseCtx {
   parser: DartParser;
   tree: LibraryDefinitionContext;
 
-  getIntervalText: (rule: ParserRuleContext | undefined) => string | null;
+  getIntervalText: <T extends ParserRuleContext | undefined>(
+    rule: T
+  ) => T extends undefined ? null : string;
 }
 
 const parseLibrary = (text: string): ParseCtx => {
@@ -76,14 +84,16 @@ const parseLibrary = (text: string): ParseCtx => {
   const parser = new DartParser(tokenStream);
   const tree: LibraryDefinitionContext = parser.libraryDefinition();
 
-  const getIntervalText = (
-    rule: ParserRuleContext | undefined
-  ): string | null => {
-    return rule?.sourceInterval
-      ? inputStream.getText(
-          new Interval(rule.start.startIndex, rule.stop!.stopIndex)
-        )
-      : null;
+  const getIntervalText = <T extends ParserRuleContext | undefined>(
+    rule: T
+  ): T extends undefined ? null : string => {
+    return (
+      rule?.sourceInterval
+        ? inputStream.getText(
+            new Interval(rule.start.startIndex, rule.stop!.stopIndex)
+          )
+        : null
+    ) as T extends undefined ? null : string;
   };
 
   return {
@@ -96,10 +106,13 @@ const parseLibrary = (text: string): ParseCtx => {
   };
 };
 
-export const parseClassesAntlr = (text: string): Array<DartClass> => {
+export const parseClassesAntlr = (
+  text: string,
+  config?: DartParserConfig
+): DartImports => {
   // Create the lexer and parser
   const ctx = parseLibrary(text);
-  const { tree } = ctx;
+  const { tree, getIntervalText } = ctx;
 
   const classes: Array<DartClass> = [];
   const functions: Array<DartFunction> = [];
@@ -109,36 +122,42 @@ export const parseClassesAntlr = (text: string): Array<DartClass> => {
     const val = (elem.libraryImport()?.importSpecification() ??
       elem.libraryExport())!;
     const isExport = val instanceof LibraryExportContext;
-    return new DartImport({
-      as: isExport ? null : val.identifier()?.text ?? null,
-      isExport,
-      hide: flatMap(
-        val
+    return new DartImport(
+      {
+        as: isExport ? null : val.identifier()?.text ?? null,
+        isExport,
+        hide: val
           .combinator()
           .filter((c) => !!c.HIDE())
-          .map((c) =>
+          .flatMap((c) =>
             c
               .identifierList()
               .identifier()
               .map((id) => id.text)
-          )
-      ),
-      show: flatMap(
-        val
+          ),
+        show: val
           .combinator()
           .filter((c) => !!c.SHOW())
-          .map((c) =>
+          .flatMap((c) =>
             c
               .identifierList()
               .identifier()
               .map((id) => id.text)
-          )
-      ),
-      // TODO:
-      isOwnPackage: false,
-      path: isExport ? val.uri().text : val.configurableUri().text,
-    });
+          ),
+        path: (isExport ? val.uri() : val.configurableUri().uri())
+          .stringLiteralWithoutInterpolation()
+          .singleStringWithoutInterpolation()
+          .map((s) => getStringData(ctx, s).content)
+          .join(),
+      },
+      config
+    );
   });
+  const mixins: Array<DartMixin> = [];
+  const extensions: Array<DartExtension> = [];
+  const enums: Array<DartEnum> = [];
+  const fields: Array<DartField> = [];
+  const typeAliases: Array<TypeAlias> = [];
 
   for (const def of tree.topLevelDefinition()) {
     const classDec = def.classDeclaration();
@@ -149,14 +168,7 @@ export const parseClassesAntlr = (text: string): Array<DartClass> => {
       def.enumType();
     const functionSignature =
       def.functionSignature() ?? def.getterSignature() ?? def.setterSignature();
-
-    // |    typeAlias
-
-    // |    EXTERNAL finalVarOrType identifierList ';'
-    // |    (FINAL | CONST) type? staticFinalDeclarationList ';'
-    // |    LATE FINAL type? initializedIdentifierList ';'
-    // |    LATE? varOrType identifier ('=' expression)?
-    //      (',' initializedIdentifier)* ';'
+    const typeAlias = def.typeAlias();
 
     if (classDec) {
       classes.push(mapClass(ctx, classDec));
@@ -164,18 +176,111 @@ export const parseClassesAntlr = (text: string): Array<DartClass> => {
       functions.push(
         mapFunction(ctx, { signature: functionSignature, context: def })
       );
+    } else if (typeAlias) {
+      const name =
+        typeAlias.typeIdentifier() ??
+        typeAlias.functionTypeAlias()!.functionPrefix().identifier();
+
+      typeAliases.push({
+        name: name.text,
+        generics: getIntervalText(
+          typeAlias.typeParameters() ??
+            typeAlias
+              .functionTypeAlias()
+              ?.formalParameterPart()
+              ?.typeParameters()
+        ),
+        type:
+          getIntervalText(typeAlias.type()) ??
+          getIntervalText(typeAlias.functionTypeAlias()!).substring(
+            0,
+            name.stop!.startIndex
+          ) +
+            " Function " +
+            getIntervalText(typeAlias.functionTypeAlias()!).substring(
+              name.stop!.stopIndex
+            ),
+      });
     } else if (objDec) {
-      const _ = parseTypeDefinition(objDec);
+      const typeDef = parseTypeDefinition(objDec);
+      switch (typeDef.kind) {
+        case TypeDefinitionKind.class:
+          break;
+        case TypeDefinitionKind.mixin: {
+          const mixin: DartMixin = {
+            generics: getIntervalText(typeDef.typeParameters),
+            on: typeDef.mixins?.map(getIntervalText) ?? [],
+            interfaces: typeDef.interfaces?.map(getIntervalText) ?? [],
+            name: typeDef.typeIdentifier!.text,
+            fields: [],
+            methods: [],
+          };
+          setClassMemberLists(ctx, typeDef.classMemberDefinitions, mixin);
+          mixins.push(mixin);
+          break;
+        }
+        case TypeDefinitionKind.extension: {
+          const extension: DartExtension = {
+            generics: getIntervalText(typeDef.typeParameters),
+            on: getIntervalText(typeDef.onExtension!),
+            name: typeDef.typeIdentifier?.text ?? null,
+            fields: [],
+            methods: [],
+          };
+          setClassMemberLists(ctx, typeDef.classMemberDefinitions, extension);
+          extensions.push(extension);
+          break;
+        }
+        case TypeDefinitionKind.enum: {
+          const enumValue: DartEnum = {
+            generics: getIntervalText(typeDef.typeParameters),
+            name: typeDef.typeIdentifier!.text,
+            fields: [],
+            methods: [],
+            constructors: [],
+            entries: typeDef.enumEntry!.map<DartEnumEntry>((e) => ({
+              name: e.identifier()[e.identifier().length - 1].text,
+              generics: getIntervalText(
+                e.typeArguments() ?? e.argumentPart()?.typeArguments()
+              ),
+              arguments:
+                (e.arguments() ?? e.argumentPart()?.arguments())
+                  ?.argumentList()
+                  ?.argument()
+                  ?.map((a) => ({
+                    name: a.label()?.text ?? null,
+                    value: getIntervalText(a.expression()),
+                  })) ?? [],
+            })),
+            interfaces: typeDef.interfaces?.map(getIntervalText) ?? [],
+            mixins: typeDef.mixins?.map(getIntervalText) ?? [],
+          };
+          setClassMemberLists(ctx, typeDef.classMemberDefinitions, enumValue);
+          enums.push(enumValue);
+          break;
+        }
+      }
+    } else {
+      // Field
+      fields.push(...mapField(ctx, def, null));
     }
   }
 
-  const parsedOutput = new DartImports({
-    classes,
-    imports,
-    cleanText: {},
-    functions,
-  });
-  return classes;
+  const parsedOutput = new DartImports(
+    {
+      classes,
+      imports,
+      cleanText: cleanRawText(text, []),
+      functions,
+      enums,
+      mixins,
+      extensions,
+      fields,
+      typeAliases,
+    },
+    config
+  );
+  return parsedOutput;
 };
 
 enum TypeDefinitionKind {
@@ -277,34 +382,6 @@ const parseTypeDefinition = (
   };
 };
 
-const getKind = <
-  T extends
-    | ClassDeclarationContext
-    | MixinDeclarationContext
-    | ExtensionDeclarationContext
-    | EnumTypeContext
->(
-  context: T
-): T extends ClassDeclarationContext
-  ? TypeDefinitionKind.class
-  : T extends MixinDeclarationContext
-  ? TypeDefinitionKind.mixin
-  : T extends ExtensionDeclarationContext
-  ? TypeDefinitionKind.extension
-  : TypeDefinitionKind.enum => {
-  const v =
-    context instanceof ClassDeclarationContext
-      ? TypeDefinitionKind.class
-      : context instanceof MixinDeclarationContext
-      ? TypeDefinitionKind.mixin
-      : context instanceof ExtensionDeclarationContext
-      ? TypeDefinitionKind.extension
-      : TypeDefinitionKind.enum;
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any
-  return v as any;
-};
-
 const mapClass = (
   ctx: ParseCtx,
   classDec: ClassDeclarationContext
@@ -320,6 +397,18 @@ const mapClass = (
     ),
     generics: getIntervalText(typeWithParameters.typeParameters()),
     name: typeWithParameters.typeIdentifier().text,
+    interfaces:
+      classDec
+        .interfaces()
+        ?.typeNotVoidNotFunctionList()
+        ?.typeNotVoidNotFunction()
+        ?.map(getIntervalText) ?? [],
+    mixins:
+      classDec
+        .mixins()
+        ?.typeNotVoidNotFunctionList()
+        ?.typeNotVoidNotFunction()
+        ?.map(getIntervalText) ?? [],
     fields: [],
     constructors: [],
     methods: [],
@@ -340,181 +429,7 @@ const mapClass = (
     },
   };
   const dartClass = new DartClass(data);
-
-  classDec
-    .classMemberDefinition()
-    .filter((c) => !c.methodSignature() && !isMethod(c))
-    .forEach((c) => {
-      const dec = c.declaration()!;
-      const identifierList: Array<{
-        name: string;
-        defaultValue?: string;
-      }> = (dec
-        .identifierList()
-        ?.identifier()
-        ?.map((id) => ({
-          name: id.text,
-        })) ??
-        dec
-          .staticFinalDeclarationList()
-          ?.staticFinalDeclaration()
-          ?.map((d) => ({
-            name: d.identifier().text,
-            defaultValue: getIntervalText(d.expression()),
-          })) ??
-        dec
-          .initializedIdentifierList()
-          ?.initializedIdentifier()
-          ?.map((d) => ({
-            name: d.identifier().text,
-            defaultValue: getIntervalText(d.expression()),
-          })))!;
-      dartClass.fields.push(
-        ...identifierList.map((id) => {
-          return new DartField(
-            {
-              isStatic: !!dec.STATIC(),
-              isFinal: !!(dec.FINAL() ?? dec.finalVarOrType()?.FINAL()),
-              isVariable: !!(
-                dec.varOrType() ?? dec.finalVarOrType()?.varOrType()
-              )?.VAR(),
-              type:
-                (
-                  dec.type() ??
-                  dec.finalVarOrType()?.type() ??
-                  dec.varOrType()?.type()
-                )?.text ?? null,
-              name: id.name,
-              defaultValue: id.defaultValue ?? null,
-            },
-            dartClass
-          );
-        })
-      );
-    });
-
-  // |    EXTERNAL (STATIC? finalVarOrType | COVARIANT varOrType) identifierList
-  // |    ABSTRACT (finalVarOrType | COVARIANT varOrType) identifierList
-  // |    STATIC (FINAL | CONST) type? staticFinalDeclarationList
-  // |    STATIC LATE FINAL type? initializedIdentifierList
-  // |    STATIC LATE? varOrType initializedIdentifierList
-  // |    COVARIANT LATE FINAL type? identifierList
-  // |    COVARIANT LATE? varOrType initializedIdentifierList
-  // |    LATE? (FINAL type? | varOrType) initializedIdentifierList
-
-  dartClass.constructors.push(
-    ...classDec
-      .classMemberDefinition()
-      .filter(isConstructor)
-      .map((m) => {
-        const context = getConstructor(m);
-
-        const dartConstructor = new DartConstructor(
-          {
-            dartClass,
-            isConst: "CONST" in context.constructorSignature,
-            name:
-              context.constructorSignature.constructorName().identifier()
-                ?.text ?? null,
-            isFactory:
-              context.constructorSignature instanceof
-                RedirectingFactoryConstructorSignatureContext ||
-              context.constructorSignature instanceof
-                FactoryConstructorSignatureContext,
-            params: [],
-          },
-          dartClass
-        );
-        dartConstructor.params.push(
-          ...getParameters(
-            context.constructorSignature.formalParameterList()
-          ).map((p) => {
-            const param = p.param;
-            return new DartConstructorParam(
-              {
-                defaultValue: getIntervalText(p.defaultExpression),
-                isNamed: p.isNamed,
-                isRequired: p.isRequired,
-                type: param.type?.text ?? null,
-                isSuper: param.THISorSUPER?.text === "super",
-                isThis: param.THISorSUPER?.text === "this",
-                name: param.identifier.text,
-              },
-              dartConstructor
-            );
-          })
-        );
-        return dartConstructor;
-      })
-  );
-
-  const constructorMethods = new Map<
-    DartFunction,
-    {
-      method: MethodSignatureAntlr;
-      classMember: ClassMemberDefinitionContext;
-      dartFunction: DartFunction;
-    }
-  >();
-
-  dartClass.methods.push(
-    ...classDec
-      .classMemberDefinition()
-      .filter(isMethod)
-      .map((m) => {
-        const context = getMethodSignature(m);
-        const methodSignature = getAntlrFunction(context, m);
-        const dartFunction = mapFunction(ctx, {
-          signature: context,
-          context: m,
-          dartClass,
-        });
-        if (dartFunction.name === dartClass.name) {
-          constructorMethods.set(dartFunction, {
-            classMember: m,
-            dartFunction,
-            method: methodSignature,
-          });
-        }
-        return dartFunction;
-      })
-  );
-
-  for (const [k, v] of constructorMethods.entries()) {
-    dartClass.methods.splice(
-      dartClass.methods.findIndex((f) => f === k),
-      1
-    );
-
-    const dartConstructor = new DartConstructor(
-      {
-        dartClass,
-        isConst: false,
-        name: null,
-        isFactory: false,
-        params: [],
-      },
-      dartClass
-    );
-    dartConstructor.params.push(
-      ...getParameters(v.method.formalParameterList!).map((p) => {
-        const param = p.param;
-        return new DartConstructorParam(
-          {
-            defaultValue: getIntervalText(p.defaultExpression),
-            isNamed: p.isNamed,
-            isRequired: p.isRequired,
-            type: param.type?.text ?? null,
-            isSuper: param.THISorSUPER?.text === "super",
-            isThis: param.THISorSUPER?.text === "this",
-            name: param.identifier.text,
-          },
-          dartConstructor
-        );
-      })
-    );
-    dartClass.constructors.push(dartConstructor);
-  }
+  setClassMemberLists(ctx, classDec.classMemberDefinition(), dartClass);
   return dartClass;
 };
 
@@ -527,7 +442,7 @@ const mapFunction = (
   }: {
     signature: AntlrFunctionContext;
     context: ClassMemberDefinitionContext | TopLevelDefinitionContext;
-    dartClass?: DartClass;
+    dartClass?: DartTypeScope;
   }
 ): DartFunction => {
   const methodSignature = getAntlrFunction(signature, context);
@@ -748,6 +663,43 @@ export interface ConstructorContext {
   redirectionOrInitializers?: RedirectionContext | InitializersContext;
 }
 
+export interface StringData {
+  isRaw: boolean;
+  isMultiline: boolean;
+  content: string;
+  context:
+    | SingleStringWithoutInterpolationContext
+    | SingleLineStringContext
+    | MultiLineStringContext;
+  expressions: Array<ExpressionContext>;
+}
+
+function getStringData(
+  ctx: ParseCtx,
+  context:
+    | SingleStringWithoutInterpolationContext
+    | SingleLineStringContext
+    | MultiLineStringContext
+): StringData {
+  const text = ctx.getIntervalText(context);
+  const isRaw = text.startsWith("r");
+  const isMultiline =
+    context instanceof MultiLineStringContext ||
+    (context instanceof SingleStringWithoutInterpolationContext &&
+      (!!context.MULTI_LINE_STRING_DQ_BEGIN_END() ||
+        !!context.MULTI_LINE_STRING_SQ_BEGIN_END()));
+  const expressions =
+    context instanceof SingleStringWithoutInterpolationContext
+      ? []
+      : context.expression();
+  const multilineDelta = isMultiline ? 3 : 1;
+  const content = text.substring(
+    (isRaw ? 1 : 0) + multilineDelta,
+    text.length - multilineDelta
+  );
+  return { isRaw, isMultiline, content, expressions, context };
+}
+
 // | {
 //     EXTERNAL?: TerminalNode;
 //     factoryConstructorSignature: FactoryConstructorSignatureContext;
@@ -832,6 +784,213 @@ export interface NormalParameterContext {
   identifier: IdentifierNotFUNCTIONContext | IdentifierContext;
   formalParameterPart: FormalParameterPartContext | undefined;
   questionMark: TerminalNode | undefined;
+}
+
+function setClassMemberLists(
+  ctx: ParseCtx,
+  classMemberDefinitions: Array<ClassMemberDefinitionContext>,
+  dartClass: DartTypeScope
+): void {
+  const { getIntervalText } = ctx;
+
+  classMemberDefinitions
+    .filter((c) => !c.methodSignature() && !isMethod(c))
+    .forEach((c) => {
+      const dec = c.declaration()!;
+      if (dec) {
+        dartClass.fields.push(...mapField(ctx, dec, dartClass));
+      } else {
+        // TODO: delete this
+        console.log("Non field", c);
+      }
+    });
+
+  // |    EXTERNAL (STATIC? finalVarOrType | COVARIANT varOrType) identifierList
+  // |    ABSTRACT (finalVarOrType | COVARIANT varOrType) identifierList
+  // |    STATIC (FINAL | CONST) type? staticFinalDeclarationList
+  // |    STATIC LATE FINAL type? initializedIdentifierList
+  // |    STATIC LATE? varOrType initializedIdentifierList
+  // |    COVARIANT LATE FINAL type? identifierList
+  // |    COVARIANT LATE? varOrType initializedIdentifierList
+  // |    LATE? (FINAL type? | varOrType) initializedIdentifierList
+
+  const constructorMethods = new Map<
+    DartFunction,
+    {
+      method: MethodSignatureAntlr;
+      classMember: ClassMemberDefinitionContext;
+      dartFunction: DartFunction;
+    }
+  >();
+
+  dartClass.methods.push(
+    ...classMemberDefinitions.filter(isMethod).map((m) => {
+      const context = getMethodSignature(m);
+      const methodSignature = getAntlrFunction(context, m);
+      const dartFunction = mapFunction(ctx, {
+        signature: context,
+        context: m,
+        dartClass,
+      });
+      if (dartFunction.name === dartClass.name) {
+        constructorMethods.set(dartFunction, {
+          classMember: m,
+          dartFunction,
+          method: methodSignature,
+        });
+      }
+      return dartFunction;
+    })
+  );
+
+  if ("constructors" in dartClass) {
+    dartClass.constructors.push(
+      ...classMemberDefinitions.filter(isConstructor).map((m) => {
+        const context = getConstructor(m);
+
+        const dartConstructor = new DartConstructor(
+          {
+            dartClass,
+            isConst: "CONST" in context.constructorSignature,
+            name:
+              context.constructorSignature.constructorName().identifier()
+                ?.text ?? null,
+            isFactory:
+              context.constructorSignature instanceof
+                RedirectingFactoryConstructorSignatureContext ||
+              context.constructorSignature instanceof
+                FactoryConstructorSignatureContext,
+            params: [],
+          },
+          dartClass
+        );
+        dartConstructor.params.push(
+          ...getParameters(
+            context.constructorSignature.formalParameterList()
+          ).map((p) => {
+            const param = p.param;
+            return new DartConstructorParam(
+              {
+                defaultValue: getIntervalText(p.defaultExpression),
+                isNamed: p.isNamed,
+                isRequired: p.isRequired,
+                type: param.type?.text ?? null,
+                isSuper: param.THISorSUPER?.text === "super",
+                isThis: param.THISorSUPER?.text === "this",
+                name: param.identifier.text,
+              },
+              dartConstructor
+            );
+          })
+        );
+        return dartConstructor;
+      })
+    );
+
+    for (const [k, v] of constructorMethods.entries()) {
+      dartClass.methods.splice(
+        dartClass.methods.findIndex((f) => f === k),
+        1
+      );
+
+      const dartConstructor = new DartConstructor(
+        {
+          dartClass,
+          isConst: false,
+          name: null,
+          isFactory: false,
+          params: [],
+        },
+        dartClass
+      );
+      dartConstructor.params.push(
+        ...getParameters(v.method.formalParameterList!).map((p) => {
+          const param = p.param;
+          return new DartConstructorParam(
+            {
+              defaultValue: getIntervalText(p.defaultExpression),
+              isNamed: p.isNamed,
+              isRequired: p.isRequired,
+              type: param.type?.text ?? null,
+              isSuper: param.THISorSUPER?.text === "super",
+              isThis: param.THISorSUPER?.text === "this",
+              name: param.identifier.text,
+            },
+            dartConstructor
+          );
+        })
+      );
+      dartClass.constructors.push(dartConstructor);
+    }
+  }
+}
+
+function mapField(
+  ctx: ParseCtx,
+  dec: DeclarationContext | TopLevelDefinitionContext,
+  dartClass: DartTypeScope | null
+): Array<DartField> {
+  // |    EXTERNAL finalVarOrType identifierList ';'
+  // |    (FINAL | CONST) type? staticFinalDeclarationList ';'
+  // |    LATE FINAL type? initializedIdentifierList ';'
+  // |    LATE? varOrType identifier ('=' expression)?
+  //      (',' initializedIdentifier)* ';'
+  const identifierList: Array<{
+    name: string;
+    defaultValue?: string | null;
+  }> =
+    dec
+      .identifierList()
+      ?.identifier()
+      ?.map((id) => ({
+        name: id.text,
+      })) ??
+    dec
+      .staticFinalDeclarationList()
+      ?.staticFinalDeclaration()
+      ?.map((d) => ({
+        name: d.identifier().text,
+        defaultValue: ctx.getIntervalText(d.expression()),
+      })) ??
+    dec
+      .initializedIdentifierList()
+      ?.initializedIdentifier()
+      ?.map((d) => ({
+        name: d.identifier().text,
+        defaultValue: ctx.getIntervalText(d.expression()),
+      })) ??
+    (dec instanceof DeclarationContext
+      ? []
+      : [
+          {
+            name: dec.identifier()!.text,
+            defaultValue: ctx.getIntervalText(dec.expression()),
+          },
+          ...dec.initializedIdentifier().map((d) => ({
+            name: d.identifier().text,
+            defaultValue: ctx.getIntervalText(d.expression()),
+          })),
+        ]);
+
+  const values = {
+    isStatic: dec instanceof DeclarationContext && !!dec.STATIC(),
+    isFinal: !!(dec.FINAL() ?? dec.finalVarOrType()?.FINAL()),
+    isVariable: !!(dec.varOrType() ?? dec.finalVarOrType()?.varOrType())?.VAR(),
+    type:
+      (dec.type() ?? dec.finalVarOrType()?.type() ?? dec.varOrType()?.type())
+        ?.text ?? null,
+  };
+
+  return identifierList.map((id) => {
+    return new DartField(
+      {
+        ...values,
+        name: id.name,
+        defaultValue: id.defaultValue ?? null,
+      },
+      dartClass
+    );
+  });
 }
 
 // // NB: It is an anomaly that a functionFormalParameter cannot be FINAL.

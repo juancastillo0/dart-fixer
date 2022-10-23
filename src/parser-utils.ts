@@ -151,30 +151,31 @@ export const cleanRawText = (
   const cleaned: Array<string> = [];
   let textIndex = 0;
   let cumulative = 0;
-  const patternMatches: Array<MatchPosition> = [...text.matchAll(combined)].map(
-    (v) => {
-      const mIndex = v.index!;
+  const patternMatches: Array<MatchPosition> =
+    regExps.length === 0
+      ? []
+      : [...text.matchAll(combined)].map((v) => {
+          const mIndex = v.index!;
 
-      cleaned.push(text.substring(textIndex, mIndex));
-      textIndex = mIndex + v[0].length;
-      const toReplace = regExps.find((_, i) => v.groups![`p${i}`])!.replace;
-      cleaned.push(toReplace);
+          cleaned.push(text.substring(textIndex, mIndex));
+          textIndex = mIndex + v[0].length;
+          const toReplace = regExps.find((_, i) => v.groups![`p${i}`])!.replace;
+          cleaned.push(toReplace);
 
-      const line = binarySearch(newLines, (index) => mIndex - index).index;
-      const currentCumulative = cumulative;
-      cumulative += v[0].length - toReplace.length;
+          const line = binarySearch(newLines, (index) => mIndex - index).index;
+          const currentCumulative = cumulative;
+          cumulative += v[0].length - toReplace.length;
 
-      return {
-        length: v[0].length,
-        index: mIndex,
-        line,
-        column: mIndex - newLines[line],
-        cumulative,
-        position: mIndex - currentCumulative,
-        text: v[0],
-      };
-    }
-  );
+          return {
+            length: v[0].length,
+            index: mIndex,
+            line,
+            column: mIndex - newLines[line],
+            cumulative,
+            position: mIndex - currentCumulative,
+            text: v[0],
+          };
+        });
   cleaned.push(text.substring(textIndex));
 
   const mapIndex = (index: number): TextPosition => {
