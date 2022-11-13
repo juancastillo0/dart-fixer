@@ -458,11 +458,14 @@ const mapFunction = (
       isOperator: signature instanceof OperatorSignatureContext,
       isStatic: !!methodSignature.STATIC,
       isExternal: !!methodSignature.EXTERNAL,
-      returnType: signature.type()?.text ?? null,
+      returnType: getTypeString(ctx, signature.type()),
       name: methodSignature.name,
+      // TODO: make it a list of type parameter objects
       generics:
         (signature instanceof FunctionSignatureContext
-          ? signature.formalParameterPart().typeParameters()?.text
+          ? ctx.getIntervalText(
+              signature.formalParameterPart().typeParameters()
+            )
           : null) ?? null,
       params: [],
     },
@@ -477,7 +480,7 @@ const mapFunction = (
               defaultValue: ctx.getIntervalText(p.defaultExpression),
               isNamed: p.isNamed,
               isRequired: p.isRequired,
-              type: p.param.type?.text ?? null,
+              type: getTypeString(ctx, p.param.type),
               name: p.param.identifier.text,
             },
             dartFunction
@@ -851,7 +854,9 @@ function setClassMemberLists(
         const dartConstructor = new DartConstructor(
           {
             dartClass,
-            isConst: "CONST" in context.constructorSignature,
+            isConst:
+              "CONST" in context.constructorSignature &&
+              !!context.constructorSignature.CONST(),
             name:
               context.constructorSignature.constructorName().identifier()
                 ?.text ?? null,
@@ -874,7 +879,7 @@ function setClassMemberLists(
                 defaultValue: getIntervalText(p.defaultExpression),
                 isNamed: p.isNamed,
                 isRequired: p.isRequired,
-                type: param.type?.text ?? null,
+                type: getTypeString(ctx, param.type),
                 isSuper: param.THISorSUPER?.text === "super",
                 isThis: param.THISorSUPER?.text === "this",
                 name: param.identifier.text,
@@ -911,7 +916,7 @@ function setClassMemberLists(
               defaultValue: getIntervalText(p.defaultExpression),
               isNamed: p.isNamed,
               isRequired: p.isRequired,
-              type: param.type?.text ?? null,
+              type: getTypeString(ctx, param.type),
               isSuper: param.THISorSUPER?.text === "super",
               isThis: param.THISorSUPER?.text === "this",
               name: param.identifier.text,
@@ -976,9 +981,10 @@ function mapField(
     isStatic: dec instanceof DeclarationContext && !!dec.STATIC(),
     isFinal: !!(dec.FINAL() ?? dec.finalVarOrType()?.FINAL()),
     isVariable: !!(dec.varOrType() ?? dec.finalVarOrType()?.varOrType())?.VAR(),
-    type:
-      (dec.type() ?? dec.finalVarOrType()?.type() ?? dec.varOrType()?.type())
-        ?.text ?? null,
+    type: getTypeString(
+      ctx,
+      dec.type() ?? dec.finalVarOrType()?.type() ?? dec.varOrType()?.type()
+    ),
   };
 
   return identifierList.map((id) => {
@@ -991,6 +997,16 @@ function mapField(
       dartClass
     );
   });
+}
+
+function getTypeString<T extends TypeContext | undefined>(
+  ctx: ParseCtx,
+  type: T
+): T extends TypeContext ? string : null {
+  if (!type) {
+    return null as T extends TypeContext ? string : null;
+  }
+  return ctx.getIntervalText(type) as T extends TypeContext ? string : null;
 }
 
 // // NB: It is an anomaly that a functionFormalParameter cannot be FINAL.

@@ -531,9 +531,7 @@ export class DartConstructorParam implements DartConstructorParamData {
       if (match.groups!["type"]) {
         this.type = match.groups!["type"].trim();
       } else {
-        this.type =
-          dartConstructor.dartClass.fields.find((v) => v.name === this.name)
-            ?.type ?? null;
+        this.type = null;
       }
     } else {
       this.isThis = params.isThis;
@@ -543,6 +541,12 @@ export class DartConstructorParam implements DartConstructorParamData {
       this.defaultValue = params.defaultValue;
       this.name = params.name;
       this.type = params.type;
+    }
+    if (!this.type && (this.isThis || this.isSuper)) {
+      // TODO: what about super class fields?
+      this.type =
+        dartConstructor.dartClass.fields.find((v) => v.name === this.name)
+          ?.type ?? null;
     }
   }
 }
