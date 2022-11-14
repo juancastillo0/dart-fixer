@@ -114,10 +114,7 @@ export const parseClassesAntlr = (
   const ctx = parseLibrary(text);
   const { tree, getIntervalText } = ctx;
 
-  const classes: Array<DartClass> = [];
-  const functions: Array<DartFunction> = [];
   const importOrExport = tree.importOrExport();
-
   const imports: Array<DartImport> = importOrExport.map((elem) => {
     const val = (elem.libraryImport()?.importSpecification() ??
       elem.libraryExport())!;
@@ -153,6 +150,9 @@ export const parseClassesAntlr = (
       config
     );
   });
+
+  const classes: Array<DartClass> = [];
+  const functions: Array<DartFunction> = [];
   const mixins: Array<DartMixin> = [];
   const extensions: Array<DartExtension> = [];
   const enums: Array<DartEnum> = [];

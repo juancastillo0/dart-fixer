@@ -213,7 +213,7 @@ ${delimiter})${[...fieldsMap.entries()]
 };
 
 export const generateEquality = (dartClass: DartClass): string => {
-  const dartConstructor = dartClass.constructors[0];
+  const dartConstructor = dartClass.defaultConstructor;
   return `
 ${dartClass.name} copyWith({
   ${dartConstructor.params

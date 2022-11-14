@@ -294,7 +294,7 @@ export class DartClass implements DartClassData {
           name: null,
           params: [],
         }
-      : this.constructors[0];
+      : this.constructors.find((c) => c.name === null) ?? this.constructors[0];
   }
 
   constructor(
