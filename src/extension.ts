@@ -1,12 +1,8 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import {
-  DartClass,
-  DartFunction,
-  DartImports,
-  dartStringRegExp,
-} from "./parser";
+import { parseClassesAntlr } from "./antlr/antlr-parser";
+import { GeneratedSection, getGeneratedSections } from "./generator-utils";
 import { generate } from "./printer";
 
 const COMMAND = "dart-fixer.helloWorld";
@@ -24,10 +20,14 @@ export function activate(context: vscode.ExtensionContext): void {
   // This line of code will only be executed once when your extension is activated
   console.log('Congratulations, your extension "dart-fixer" is now active!');
 
+  const fixerDiagnostics =
+    vscode.languages.createDiagnosticCollection("dart-fixer");
+  context.subscriptions.push(fixerDiagnostics);
+
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { language: "dart", scheme: "file" },
-      new DartCodeActionProvider(),
+      new DartCodeActionProvider(fixerDiagnostics),
       DartCodeActionProvider.metadata
     )
   );
@@ -45,10 +45,6 @@ export function activate(context: vscode.ExtensionContext): void {
   });
 
   context.subscriptions.push(disposable);
-
-  console.log(dartStringRegExp);
-  console.log(DartClass.classRegExp);
-  console.log(DartFunction.functionRegExp);
 }
 
 async function printDefinitionsForActiveEditor(): Promise<void> {
@@ -68,6 +64,8 @@ async function printDefinitionsForActiveEditor(): Promise<void> {
 }
 
 class DartCodeActionProvider implements vscode.CodeActionProvider {
+  constructor(public diagnosticCollection: vscode.DiagnosticCollection) {}
+
   static readonly metadata: vscode.CodeActionProviderMetadata = {
     providedCodeActionKinds: [
       vscode.CodeActionKind.QuickFix,
@@ -82,41 +80,74 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
     // token: vscode.CancellationToken
   ): Array<vscode.CodeAction> {
     const text = document.getText();
-    const values = new DartImports(text);
+    const values = parseClassesAntlr(text);
     console.log(values);
+    const generatedSections = getGeneratedSections(document);
 
     const actions: Array<vscode.CodeAction> = [new DartFixImportsCodeAction()];
+    const diagnostics: Array<vscode.Diagnostic> = [];
 
     for (const dartClass of values.classes) {
       const originalStart = dartClass.bracket.originalStart;
       const originalEnd = dartClass.bracket.originalEnd;
-      if (
-        !new vscode.Range(
-          originalStart.line,
-          originalStart.column,
-          originalEnd.line,
-          originalEnd.column
-        ).contains(range)
-      ) {
+      const classRange = new vscode.Range(
+        originalStart.line,
+        originalStart.column,
+        originalEnd.line,
+        originalEnd.column
+      );
+      if (!classRange.contains(range)) {
         continue;
       }
       const action = new vscode.CodeAction(
         "Generate Class Helpers",
         vscode.CodeActionKind.QuickFix
       );
-      const value = generate(dartClass, {});
-      const lastBracket = new vscode.Range(
+      const { content, md5Hash } = generate(dartClass, {});
+      let foundSection: GeneratedSection | undefined;
+      for (const section of generatedSections.values()) {
+        if (
+          section.start.line > originalStart.line &&
+          section.end &&
+          originalEnd.line < section.end.line
+        ) {
+          foundSection = section;
+        }
+      }
+
+      let rangeToEdit = new vscode.Range(
         originalEnd.line,
         originalEnd.column,
         originalEnd.line,
         originalEnd.column + 1
       );
+      if (foundSection) {
+        if (foundSection.md5Hash !== md5Hash) {
+          const diagnostic = new vscode.Diagnostic(
+            document.lineAt(foundSection.start.line).range,
+            "Generated section is out of date",
+            vscode.DiagnosticSeverity.Error
+          );
+          diagnostic.source = "dart-fixer";
+          diagnostic.code = "generated-out-of-date";
+          diagnostics.push(diagnostic);
+          action.diagnostics = [diagnostic];
+        }
+        rangeToEdit = new vscode.Range(
+          foundSection.start.line,
+          0,
+          foundSection.end!.line + 1,
+          0
+        );
+      }
+
       action.edit = new vscode.WorkspaceEdit();
-      action.edit.replace(document.uri, lastBracket, value);
-      // action.diagnostics = [diagnostic];
+      action.edit.replace(document.uri, rangeToEdit, content);
       action.isPreferred = true;
       actions.push(action);
     }
+
+    this.diagnosticCollection.set(document.uri, diagnostics);
     return actions;
   }
 

@@ -42,7 +42,7 @@ const defaultGenerationOptions: GenerationOptions = {
 export const generate = (
   dartClass: DartClass,
   options: GenerationOptions
-): string => {
+): { content: string; md5Hash: string } => {
   options = { ...options };
   for (const [k, v] of Object.entries(defaultGenerationOptions)) {
     if (!(k in options)) {
@@ -64,11 +64,13 @@ ${options.builder ? generateBuilder(dartClass) : ""}\
     md5Hash,
   });
 
-  return `
+  const content = `
 // generated-dart-fixer-start${data}
 ${output}
-// generated-dart-fixer-end
+// generated-dart-fixer-end${data}
 `;
+
+  return { content, md5Hash };
 };
 
 export const generateFromJson = (
