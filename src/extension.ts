@@ -1,11 +1,12 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { parseClassesAntlr } from "./antlr/antlr-parser";
-import { GeneratedSection, getGeneratedSections } from "./generator-utils";
-import { generate } from "./printer";
+import { DartAnalyzer } from "./analyzer";
+import { createOutOfDateDiagnostic, GeneratedSection } from "./generator-utils";
+import { generate, GenerationOptions } from "./printer";
 
-const COMMAND = "dart-fixer.helloWorld";
+export const EXTENSION_NAME = "dart-fixer";
+const COMMAND = `${EXTENSION_NAME}.helloWorld`;
 
 const COMMAND_OBJECT: vscode.Command = {
   command: COMMAND,
@@ -13,21 +14,33 @@ const COMMAND_OBJECT: vscode.Command = {
   tooltip: "FixImports",
 };
 
+const getExtensionConfig = (): GenerationOptions | undefined =>
+  vscode.workspace.getConfiguration(`dartFixer`).get("config");
+
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext): void {
   // Use the console to output diagnostic information (console.log) and errors (console.error)
   // This line of code will only be executed once when your extension is activated
-  console.log('Congratulations, your extension "dart-fixer" is now active!');
+  console.log(
+    `Congratulations, your extension "${EXTENSION_NAME}" is now active!`
+  );
 
   const fixerDiagnostics =
     vscode.languages.createDiagnosticCollection("dart-fixer");
   context.subscriptions.push(fixerDiagnostics);
 
+  const analyzer = new DartAnalyzer(getExtensionConfig());
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(() =>
+      analyzer.updateConfig(getExtensionConfig())
+    )
+  );
+
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { language: "dart", scheme: "file" },
-      new DartCodeActionProvider(fixerDiagnostics),
+      new DartCodeActionProvider(fixerDiagnostics, analyzer),
       DartCodeActionProvider.metadata
     )
   );
@@ -64,7 +77,10 @@ async function printDefinitionsForActiveEditor(): Promise<void> {
 }
 
 class DartCodeActionProvider implements vscode.CodeActionProvider {
-  constructor(public diagnosticCollection: vscode.DiagnosticCollection) {}
+  constructor(
+    public diagnosticCollection: vscode.DiagnosticCollection,
+    public analyzer: DartAnalyzer
+  ) {}
 
   static readonly metadata: vscode.CodeActionProviderMetadata = {
     providedCodeActionKinds: [
@@ -73,21 +89,24 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
     ],
   };
 
-  provideCodeActions(
+  async provideCodeActions(
     document: vscode.TextDocument,
-    range: vscode.Range | vscode.Selection
-    // context: vscode.CodeActionContext,
-    // token: vscode.CancellationToken
-  ): Array<vscode.CodeAction> {
-    const text = document.getText();
-    const values = parseClassesAntlr(text);
-    console.log(values);
-    const generatedSections = getGeneratedSections(document);
+    range: vscode.Range | vscode.Selection,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: vscode.CodeActionContext,
+    token: vscode.CancellationToken
+  ): Promise<Array<vscode.CodeAction>> {
+    const result = await this.analyzer.getData(document);
+    if (token.isCancellationRequested || result.error) {
+      return [];
+    }
+    const data = result.data;
+    console.log(data.values);
 
     const actions: Array<vscode.CodeAction> = [new DartFixImportsCodeAction()];
     const diagnostics: Array<vscode.Diagnostic> = [];
 
-    for (const dartClass of values.classes) {
+    for (const dartClass of data.values.classes) {
       const originalStart = dartClass.bracket.originalStart;
       const originalEnd = dartClass.bracket.originalEnd;
       const classRange = new vscode.Range(
@@ -96,25 +115,27 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
         originalEnd.line,
         originalEnd.column
       );
-      if (!classRange.contains(range)) {
-        continue;
-      }
-      const action = new vscode.CodeAction(
-        "Generate Class Helpers",
-        vscode.CodeActionKind.QuickFix
-      );
-      const { content, md5Hash } = generate(dartClass, {});
       let foundSection: GeneratedSection | undefined;
-      for (const section of generatedSections.values()) {
+      for (const section of data.generatedSections.values()) {
         if (
           section.start.line > originalStart.line &&
+          section.start.line < originalEnd.line &&
           section.end &&
-          originalEnd.line < section.end.line
+          section.end.line > originalEnd.line
         ) {
           foundSection = section;
         }
       }
+      // if !foundSection then there will be no diagnostic
+      if (!classRange.contains(range) && !foundSection) {
+        continue;
+      }
 
+      const action = new vscode.CodeAction(
+        "Generate Class Helpers",
+        vscode.CodeActionKind.QuickFix
+      );
+      const { content, md5Hash } = generate(dartClass, data.config ?? {});
       let rangeToEdit = new vscode.Range(
         originalEnd.line,
         originalEnd.column,
@@ -123,13 +144,7 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
       );
       if (foundSection) {
         if (foundSection.md5Hash !== md5Hash) {
-          const diagnostic = new vscode.Diagnostic(
-            document.lineAt(foundSection.start.line).range,
-            "Generated section is out of date",
-            vscode.DiagnosticSeverity.Error
-          );
-          diagnostic.source = "dart-fixer";
-          diagnostic.code = "generated-out-of-date";
+          const diagnostic = createOutOfDateDiagnostic(document, foundSection);
           diagnostics.push(diagnostic);
           action.diagnostics = [diagnostic];
         }
@@ -144,10 +159,15 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
       action.edit = new vscode.WorkspaceEdit();
       action.edit.replace(document.uri, rangeToEdit, content);
       action.isPreferred = true;
-      actions.push(action);
+      // Only show action within a class
+      if (classRange.contains(range)) {
+        actions.push(action);
+      }
     }
 
-    this.diagnosticCollection.set(document.uri, diagnostics);
+    if (result.didChange) {
+      this.diagnosticCollection.set(document.uri, diagnostics);
+    }
     return actions;
   }
 

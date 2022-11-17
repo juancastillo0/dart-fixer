@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { EXTENSION_NAME } from "./extension";
 
 export interface GeneratedSection {
   md5Hash: string;
@@ -45,4 +46,19 @@ export const getGeneratedSections = (
     }
   }
   return generatedSections;
+};
+
+export const createOutOfDateDiagnostic = (
+  document: vscode.TextDocument,
+  foundSection: GeneratedSection
+): vscode.Diagnostic => {
+  const diagnostic = new vscode.Diagnostic(
+    document.lineAt(foundSection.start.line).range,
+    "Generated section is out of date",
+    vscode.DiagnosticSeverity.Error
+  );
+  diagnostic.source = EXTENSION_NAME;
+  diagnostic.code = "generated-out-of-date";
+  // diagnostic.relatedInformation
+  return diagnostic;
 };
