@@ -37,6 +37,7 @@ import {
   SingleStringWithoutInterpolationContext,
   SingleLineStringContext,
   MultiLineStringContext,
+  ImportOrExportContext,
 } from "../antlr/generated-antlr/DartParser";
 import { DartLexer } from "../antlr/generated-antlr/DartLexer";
 import {
@@ -77,7 +78,7 @@ export interface ParseCtx {
   ) => T extends undefined ? null : string;
 }
 
-const parseLibrary = (text: string): ParseCtx => {
+export const parseLibrary = (text: string): ParseCtx => {
   const inputStream = new ANTLRInputStream(text);
   const lexer = new DartLexer(inputStream);
   const tokenStream = new CommonTokenStream(lexer);
@@ -115,41 +116,9 @@ export const parseClassesAntlr = (
   const { tree, getIntervalText } = ctx;
 
   const importOrExport = tree.importOrExport();
-  const imports: Array<DartImport> = importOrExport.map((elem) => {
-    const val = (elem.libraryImport()?.importSpecification() ??
-      elem.libraryExport())!;
-    const isExport = val instanceof LibraryExportContext;
-    return new DartImport(
-      {
-        as: isExport ? null : val.identifier()?.text ?? null,
-        isExport,
-        hide: val
-          .combinator()
-          .filter((c) => !!c.HIDE())
-          .flatMap((c) =>
-            c
-              .identifierList()
-              .identifier()
-              .map((id) => id.text)
-          ),
-        show: val
-          .combinator()
-          .filter((c) => !!c.SHOW())
-          .flatMap((c) =>
-            c
-              .identifierList()
-              .identifier()
-              .map((id) => id.text)
-          ),
-        path: (isExport ? val.uri() : val.configurableUri().uri())
-          .stringLiteralWithoutInterpolation()
-          .singleStringWithoutInterpolation()
-          .map((s) => getStringData(ctx, s).content)
-          .join(),
-      },
-      config
-    );
-  });
+  const imports: Array<DartImport> = importOrExport.map((e) =>
+    mapContextToDartImport(ctx, e, config)
+  );
 
   const classes: Array<DartClass> = [];
   const functions: Array<DartFunction> = [];
@@ -380,6 +349,46 @@ const parseTypeDefinition = (
         ? context.superclass()?.typeNotVoidNotFunction()
         : undefined,
   };
+};
+
+export const mapContextToDartImport = (
+  ctx: ParseCtx,
+  elem: ImportOrExportContext,
+  config: DartParserConfig | undefined
+): DartImport => {
+  const val = (elem.libraryImport()?.importSpecification() ??
+    elem.libraryExport())!;
+  const isExport = val instanceof LibraryExportContext;
+  return new DartImport(
+    {
+      as: isExport ? null : val.identifier()?.text ?? null,
+      isExport,
+      hide: val
+        .combinator()
+        .filter((c) => !!c.HIDE())
+        .flatMap((c) =>
+          c
+            .identifierList()
+            .identifier()
+            .map((id) => id.text)
+        ),
+      show: val
+        .combinator()
+        .filter((c) => !!c.SHOW())
+        .flatMap((c) =>
+          c
+            .identifierList()
+            .identifier()
+            .map((id) => id.text)
+        ),
+      path: (isExport ? val.uri() : val.configurableUri().uri())
+        .stringLiteralWithoutInterpolation()
+        .singleStringWithoutInterpolation()
+        .map((s) => getStringData(ctx, s).content)
+        .join(),
+    },
+    config
+  );
 };
 
 const mapClass = (
