@@ -52,7 +52,7 @@ final List<String>? params;
 
 }
 `;
-  const values = new DartImports(text);
+  const values = parseClassesAntlr(text);
   const dartClass = values.classes[0];
 
   test("generateFromJson", () => {
@@ -72,7 +72,7 @@ factory Model.fromJson(Map json) {
   });
 
   test("generateToJson", () => {
-    const output = generateToJson(dartClass);
+    const output = generateToJson(dartClass.fieldsNotStatic);
     assert.equal(
       output,
       `
@@ -88,7 +88,7 @@ Map<String, Object?> toJson() {
   });
 
   test("generateEquality", () => {
-    const output = generateEquality(dartClass);
+    const output = generateEquality(dartClass, dartClass.defaultConstructor!);
     assert.equal(
       output,
       `
@@ -122,14 +122,14 @@ int get hashCode {
 
 @override
 String toString() {
-  return 'Model(v:$v,value:$value,params:$params,length:$length,);';
+  return "Model\${{"v":v,"value":value,"params":params,}}";
 }
 `
     );
   });
 
   test("generateAllFieldsGetter", () => {
-    const output = generateAllFieldsGetter(dartClass);
+    const output = generateAllFieldsGetter(dartClass.fieldsNotStatic);
     assert.equal(
       output,
       `
@@ -157,7 +157,7 @@ enum ModelFields {
   final bool isVariable;
   final Object? defaultValue;
 
-  bool get isNullable => type.endsWith('?');
+  bool get isNullable => type.endsWith("?");
 
   Object? get(Model object) {
     switch (this) {
@@ -174,7 +174,7 @@ enum ModelFields {
   });
 
   test("generateBuilder", () => {
-    const output = generateBuilder(dartClass);
+    const output = generateBuilder(dartClass, dartClass.defaultConstructor!);
     assert.equal(
       output,
       `
