@@ -287,14 +287,11 @@ export class DartClass implements DartClassData {
     return this.fields.filter((p) => !p.isStatic);
   }
 
-  get defaultConstructor(): DartConstructorSpec {
-    return this.constructors.length === 0
-      ? {
-          dartClass: this,
-          name: null,
-          params: [],
-        }
-      : this.constructors.find((c) => c.name === null) ?? this.constructors[0];
+  get defaultConstructor(): DartConstructor | undefined {
+    return (
+      this.constructors.find((c) => c.name === null) ??
+      this.constructors.find((c) => !c.isFactory)
+    );
   }
 
   constructor(

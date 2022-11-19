@@ -1,7 +1,8 @@
 import * as assert from "assert";
 import { Test } from "mocha";
-import { DartImports } from "../parser";
+import { parseClassesAntlr } from "../antlr/antlr-parser";
 import {
+  generate,
   generateAllFieldsEnum,
   generateAllFieldsGetter,
   generateBuilder,
@@ -242,6 +243,239 @@ class ModelBuilder {
   ModelBuilder clone() => ModelBuilder().apply(this);
   ModelBuilder copyWith(ModelBuilder other) => clone().apply(other);
 }
+`
+    );
+  });
+
+  test("generate", () => {
+    const parsed = parseClassesAntlr(`
+class O {
+  final String a;
+  final int? b;
+  final d;
+  var c;
+  int e;
+  Map<String, dynamic>? f;
+}`);
+    const { content } = generate(parsed.classes[0], {});
+    assert.equal(
+      content,
+      `
+O({required this.a,this.b,required this.d,required this.c,required this.e,this.f,});
+// generated-dart-fixer-start{"md5Hash":"gagS+2Qp5HLYgTyBcyKb2w=="}
+  
+factory O.fromJson(Map json) {
+  return O(
+    a: json["a"] as String,
+    b: json["b"] as int?,
+    d: json["d"],
+    c: json["c"],
+    e: json["e"] as int,
+    f: json["f"] == null ? null : (json["f"] as Map).map((k, v) => MapEntry(k as String,v)),
+  );
+}
+  
+Map<String, Object?> toJson() {
+  return {
+    "a": a,
+    "b": b,
+    "d": d,
+    "c": c,
+    "e": e,
+    "f": f,
+  };  
+}
+  
+O copyWith({
+  String? a,
+  int? b, bool bToNull = false,
+  Object? d,
+  Object? c,
+  int? e,
+  Map<String, dynamic>? f, bool fToNull = false,
+}) {
+  return O(
+    a: a ?? this.a,
+    b: b ?? (bToNull ? null : this.b),
+    d: d ?? this.d,
+    c: c ?? this.c,
+    e: e ?? this.e,
+    f: f ?? (fToNull ? null : this.f),
+  );
+}
+
+@override
+bool operator ==(Object? other) {
+  return identical(other, this) || other is O && other.runtimeType == runtimeType
+   && other.a == a && other.b == b && other.d == d && other.c == c && other.e == e && other.f == f;
+}
+
+@override
+int get hashCode {
+  return Object.hashAll([
+    runtimeType,
+    a,
+    b,
+    d,
+    c,
+    e,
+    f,
+  ]);
+}
+
+@override
+String toString() {
+  return "O\${{"a":a,"b":b,"d":d,"c":c,"e":e,"f":f,}}";
+}
+  
+List<Object?> get allFields => [
+  a,
+  b,
+  d,
+  c,
+  e,
+  f,
+];
+}
+
+
+enum OFields {
+  a("String", isFinal: true, isVariable: false, defaultValue: null,),
+  b("int?", isFinal: true, isVariable: false, defaultValue: null,),
+  d("", isFinal: true, isVariable: false, defaultValue: null,),
+  c("", isFinal: false, isVariable: true, defaultValue: null,),
+  e("int", isFinal: false, isVariable: false, defaultValue: null,),
+  f("Map<String, dynamic>?", isFinal: false, isVariable: false, defaultValue: null,);
+
+  final String type;
+  final bool isFinal;
+  final bool isVariable;
+  final Object? defaultValue;
+
+  bool get isNullable => type.endsWith("?");
+
+  Object? get(O object) {
+    switch (this) {
+      case OFields.a: return object.a;
+      case OFields.b: return object.b;
+      case OFields.d: return object.d;
+      case OFields.c: return object.c;
+      case OFields.e: return object.e;
+      case OFields.f: return object.f;
+    }
+  }
+
+  const OFields(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
+}
+
+class OBuilder {
+  
+  bool aIsSet = false;
+  String? _a;
+  String? get a => _a;
+  set a(String? newValue) {
+    _a = newValue;
+    aIsSet = true;
+  }
+  OBuilder aSet(String newValue) {
+    a = newValue;
+    return this;
+  }
+
+  bool bIsSet = false;
+  int? _b;
+  int? get b => _b;
+  set b(int? newValue) {
+    _b = newValue;
+    bIsSet = true;
+  }
+  OBuilder bSet(int? newValue) {
+    b = newValue;
+    return this;
+  }
+
+  bool dIsSet = false;
+  Object? _d;
+  Object? get d => _d;
+  set d(Object? newValue) {
+    _d = newValue;
+    dIsSet = true;
+  }
+  OBuilder dSet(Object newValue) {
+    d = newValue;
+    return this;
+  }
+
+  bool cIsSet = false;
+  Object? _c;
+  Object? get c => _c;
+  set c(Object? newValue) {
+    _c = newValue;
+    cIsSet = true;
+  }
+  OBuilder cSet(Object newValue) {
+    c = newValue;
+    return this;
+  }
+
+  bool eIsSet = false;
+  int? _e;
+  int? get e => _e;
+  set e(int? newValue) {
+    _e = newValue;
+    eIsSet = true;
+  }
+  OBuilder eSet(int newValue) {
+    e = newValue;
+    return this;
+  }
+
+  bool fIsSet = false;
+  Map<String, dynamic>? _f;
+  Map<String, dynamic>? get f => _f;
+  set f(Map<String, dynamic>? newValue) {
+    _f = newValue;
+    fIsSet = true;
+  }
+  OBuilder fSet(Map<String, dynamic>? newValue) {
+    f = newValue;
+    return this;
+  }
+
+  bool get isValidValue {
+    return a != null && e != null;
+  }
+
+  O? tryToValue() {
+    if (!isValidValue) {
+      return null;
+    }
+    return O(
+      a: a as String,
+      b: b,
+      d: d,
+      c: c,
+      e: e as int,
+      f: f,
+    );
+  }
+  
+  OBuilder apply(OBuilder other) {
+    if (other.aIsSet){a = other.a;}
+    if (other.bIsSet){b = other.b;}
+    if (other.dIsSet){d = other.d;}
+    if (other.cIsSet){c = other.c;}
+    if (other.eIsSet){e = other.e;}
+    if (other.fIsSet){f = other.f;}
+    
+    return this;
+  }
+
+  OBuilder clone() => OBuilder().apply(this);
+  OBuilder copyWith(OBuilder other) => clone().apply(other);
+}
+
+// generated-dart-fixer-end{"md5Hash":"gagS+2Qp5HLYgTyBcyKb2w=="}
 `
     );
   });
