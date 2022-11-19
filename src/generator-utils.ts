@@ -6,16 +6,17 @@ export interface GeneratedSection {
   start: vscode.Position;
   end?: vscode.Position;
 }
+const SECTION_PREFIX = "// generated-dart-fixer-";
 
 export const getGeneratedSections = (
   document: vscode.TextDocument
 ): Map<string, GeneratedSection> => {
   const generated = [
-    ...document.getText().matchAll(new RegExp("// generated-dart-fixer-", "g")),
+    ...document.getText().matchAll(new RegExp(SECTION_PREFIX, "g")),
   ];
   const generatedSections = new Map<string, GeneratedSection>();
-  const _startPrefix = "// generated-dart-fixer-start";
-  const _endPrefix = "// generated-dart-fixer-end";
+  const _startPrefix = `${SECTION_PREFIX}start`;
+  const _endPrefix = `${SECTION_PREFIX}end`;
   for (const match of generated) {
     const linePosition = document.positionAt(match.index!);
     const line = document.lineAt(linePosition.line).text;

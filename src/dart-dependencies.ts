@@ -41,44 +41,48 @@ export const getDartPackageData = async (): Promise<
   return result;
 };
 
-export const getRootDir = (
-  document: vscode.TextDocument,
-  pubSpecDataE: { data: PubSpecData; uri: vscode.Uri } | undefined
-): vscode.Uri | undefined => {
-  const dir = pubSpecDataE?.data
-    ? vscode.Uri.joinPath(pubSpecDataE.uri, "..")
+export const getRootDir = (params: {
+  uri: vscode.Uri;
+  pubSpecUri: vscode.Uri | undefined;
+}): vscode.Uri | undefined => {
+  const dir = params?.pubSpecUri
+    ? vscode.Uri.joinPath(params.pubSpecUri, "..")
     : ((): vscode.Uri | undefined => {
-        let current = document.uri;
+        let current = params.uri;
         while (
-          !current.path.endsWith("/src") &&
-          !current.path.endsWith("/lib")
+          ["/src", "/lib", "/bin"].every((p) => !current.path.endsWith(p))
         ) {
           current = vscode.Uri.joinPath(current, "..");
           if (["", "/", "\\"].includes(current.path)) {
             return undefined;
           }
         }
-        return current;
+        return vscode.Uri.joinPath(current, "..");
       })();
 
   return dir;
 };
 
-export const resolveUri = (
-  document: vscode.TextDocument,
-  pubSpecDataE: { data: PubSpecData; uri: vscode.Uri } | undefined,
-  dir: vscode.Uri | undefined,
-  importItem: DartImport
-): vscode.Uri | undefined => {
+export const resolveUri = ({
+  fileUri,
+  packageName,
+  rootDir,
+  importItem,
+}: {
+  fileUri: vscode.Uri;
+  packageName: string | undefined;
+  rootDir: vscode.Uri | undefined;
+  importItem: DartImport;
+}): vscode.Uri | undefined => {
   let uri: vscode.Uri | undefined;
   if (importItem.path.startsWith(".")) {
-    uri = vscode.Uri.joinPath(document.uri, "..", importItem.path);
-  } else if (dir) {
-    const p = importItem.path.replace(
-      `package:${pubSpecDataE?.data?.name ?? ""}`,
-      ""
-    );
-    uri = vscode.Uri.joinPath(dir, p);
+    uri = vscode.Uri.joinPath(fileUri, "..", importItem.path);
+  } else if (rootDir) {
+    const p = importItem.path.replace(`package:${packageName ?? ""}`, "");
+    uri = vscode.Uri.joinPath(rootDir, p);
+    if (!fs.existsSync(uri.fsPath)) {
+      uri = vscode.Uri.joinPath(rootDir, "lib", p);
+    }
   }
   return uri;
 };

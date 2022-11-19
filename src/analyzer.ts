@@ -33,6 +33,7 @@ export class DartAnalyzer {
 
   globalConfig: GenerationOptions | undefined;
   pubSpecDataMap: Map<vscode.Uri, PubSpecData> | undefined;
+  // TODO: remove deleted files
   cache = new Map<string, ParsedDartFile>();
 
   updateConfig = (globalConfig: GenerationOptions | undefined): void => {
@@ -54,55 +55,63 @@ export class DartAnalyzer {
     }
     let pubSpecDataE: { data: PubSpecData; uri: vscode.Uri } | undefined;
     for (const [k, v] of this.pubSpecDataMap.entries()) {
-      const dir = k.toString().split("/");
+      const dir = vscode.Uri.joinPath(k, "..");
       if (
-        document.uri
-          .toString()
-          .startsWith(dir.splice(dir.length - 1, 1).join("/"))
+        document.uri.toString().startsWith(dir.toString()) &&
+        (!pubSpecDataE ||
+          k.toString().length > pubSpecDataE.uri.toString().length)
       ) {
         pubSpecDataE = { data: v, uri: k };
       }
     }
     const previousData = this.cache.get(document.uri.toString());
-    let didChange = false;
-    let data = previousData?.data;
-    if (!data || previousData?.version !== document.version) {
-      didChange = true;
-      console.log("CHANGE");
-      try {
-        const text = document.getText();
 
-        const values = parseClassesAntlr(text, {
-          packageName: pubSpecDataE?.data?.name,
-        });
-        const dir = getRootDir(document, pubSpecDataE);
-        for (const importItem of values.imports.filter(
-          (im) => im.isOwnPackage
-        )) {
-          const uri = resolveUri(document, pubSpecDataE, dir, importItem);
-          if (uri) {
-            console.log("uri ", uri);
-            const doc = await vscode.workspace.openTextDocument(uri);
-            // TODO:
-            doc.getText();
-          }
-        }
-        const generatedSections = getGeneratedSections(document);
-        data = {
-          values,
-          generatedSections,
-          config: pubSpecDataE?.data?.dart_fixer ?? this.globalConfig,
-        };
-        this.cache.set(document.uri.toString(), {
-          version: document.version,
-          text,
-          data,
-        });
-      } catch (error) {
-        console.error(error);
-        return { error: error as object };
-      }
+    let data = previousData?.data;
+    if (data && previousData?.version === document.version) {
+      return { didChange: false, data };
     }
-    return { didChange, data };
+    console.log("CHANGE");
+
+    try {
+      const packageName = pubSpecDataE?.data?.name;
+      const text = document.getText();
+      const values = parseClassesAntlr(text, {
+        packageName,
+      });
+
+      const rootDir = getRootDir({
+        uri: document.uri,
+        pubSpecUri: pubSpecDataE?.uri,
+      });
+      for (const importItem of values.imports.filter((im) => im.isOwnPackage)) {
+        const uri = resolveUri({
+          fileUri: document.uri,
+          packageName,
+          rootDir,
+          importItem,
+        });
+        if (uri) {
+          console.log("uri ", uri);
+          const doc = await vscode.workspace.openTextDocument(uri);
+          // TODO:
+          console.log("uri file ", doc.getText());
+        }
+      }
+      const generatedSections = getGeneratedSections(document);
+      data = {
+        values,
+        generatedSections,
+        config: pubSpecDataE?.data?.dart_fixer ?? this.globalConfig,
+      };
+      this.cache.set(document.uri.toString(), {
+        version: document.version,
+        text,
+        data,
+      });
+    } catch (error) {
+      console.error(error);
+      return { error: error as object };
+    }
+    return { didChange: true, data };
   };
 }
