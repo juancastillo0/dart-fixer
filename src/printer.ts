@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { DartModelPrinter } from "./dart-model-printer";
 import {
   DartClass,
   DartConstructor,
@@ -75,16 +76,7 @@ ${options.builder ? generateBuilder(dartClass, defaultConstructor) : ""}\
 
   const generatedConstructor = dartClass.defaultConstructor
     ? ""
-    : `${defaultConstructor.isConst ? "const " : ""}${
-        dartClass.name
-      }(${defaultConstructor.params
-        .map(
-          (p, i) =>
-            `${i === 0 ? "{" : ""}${p.isRequired ? "required " : ""}this.${
-              p.name
-            },${i === defaultConstructor.params.length - 1 ? "}" : ""}`
-        )
-        .join("")});\n`;
+    : `\n${new DartModelPrinter().printConstructor(defaultConstructor)}\n`;
   const content = `
 ${generatedConstructor}\
 // generated-dart-fixer-start${data}
@@ -95,14 +87,18 @@ ${output}
   return { content, md5Hash };
 };
 
-const makeConstructorFromFields = (dartClass: DartClass): DartConstructor => {
+const makeConstructorFromFields = (
+  dartClass: DartClass,
+  opts?: { body?: string; name?: string }
+): DartConstructor => {
   const classConstructor = new DartConstructor(
     {
       isConst: dartClass.fieldsNotStatic.every((f) => f.isFinal),
       isFactory: false,
-      name: null,
+      name: opts?.name ?? null,
       params: [],
       dartClass,
+      body: opts?.body ?? null,
     },
     dartClass
   );
