@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import { DartAnalyzer } from "../analyzer";
 import { DartModelPrinter } from "../dart-model-printer";
+import { COMMAND_GENERATE_JTD } from "../extension";
 import { dartTypeFromSchema } from "../json-type-definition/dart-from-json";
 import { SomeJTDSchemaType } from "../json-type-definition/schema";
+import { generate } from "../printer";
 
 export class JsonTypeDefinitionDartCodeActionProvider
   implements vscode.CodeActionProvider
@@ -28,7 +30,11 @@ export class JsonTypeDefinitionDartCodeActionProvider
         vscode.CodeActionKind.QuickFix
       );
       action.isPreferred = true;
-      action.edit = createDartModelFromJTD(document);
+      action.command = {
+        command: COMMAND_GENERATE_JTD,
+        title: "Dart Fixer: Dart Model from JSON Type Definition",
+        tooltip: "Generate Dart Model from JSON Type Definition",
+      };
       actions.push(action);
     } catch (error) {
       console.log(error);
@@ -48,14 +54,24 @@ export const createDartModelFromJTD = (
   const dartType = dartTypeFromSchema(value, [name]);
 
   const printer = new DartModelPrinter();
+  const classes = [...dartType.ctx.classes.values()];
   const text = `\
 // generated from "./${fileName}"
+${[...dartType.ctx.imports.values()].join("\n")}\
 
-${[...dartType.ctx.classes.values()].map(printer.printClass).join("\n\n")}\
+${classes
+  .map(printer.printClass)
+  .map((c, i) =>
+    // for base union classes with no fields
+    classes[i].fields.length === 0
+      ? c
+      : `${c.substring(0, c.length - 1)}${generate(classes[i], {}).content}`
+  )
+  .join("\n\n")}\
 ${[...dartType.ctx.enums.values()].map(printer.printEnum).join("\n\n")}\
 ${[...dartType.ctx.primitiveRefs.entries()]
   .map(([name, type]) => `typedef ${name} = ${type};`)
-  .join("\n\n")}\
+  .join("\n\n")}
 `;
 
   const edit = new vscode.WorkspaceEdit();

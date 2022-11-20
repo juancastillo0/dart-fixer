@@ -11,7 +11,7 @@ import { generate, GenerationOptions } from "./printer";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
-const COMMAND_GENERATE_JTD = `${EXTENSION_NAME}.dartModelFromJTD`;
+export const COMMAND_GENERATE_JTD = `${EXTENSION_NAME}.dartModelFromJTD`;
 
 const COMMAND_OBJECT: vscode.Command = {
   command: COMMAND,
@@ -57,7 +57,12 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       const edit = createDartModelFromJTD(activeEditor.document);
-      return vscode.workspace.applyEdit(edit);
+      const success = await vscode.workspace.applyEdit(edit);
+      if (success) {
+        await vscode.window.showTextDocument(edit.entries()[0][0]);
+        return vscode.commands.executeCommand("editor.action.formatDocument");
+      }
+      return false;
     })
   );
 
