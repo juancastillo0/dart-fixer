@@ -23,7 +23,7 @@ ${
     : ""
 }\
 {
-  ${dartClass.constructors.map(this.printConstructor).join("\n  ")}\
+  ${dartClass.constructors.map(this.printConstructor).join("\n\n  ")}\
   ${dartClass.fields.map(this.printField).join("\n  ")}\
   ${dartClass.methods.map(this.printFunction).join("\n  ")}\
 }`;
@@ -80,7 +80,9 @@ ${dartConstructor.isConst ? "const " : ""}\
 ${dartConstructor.isFactory ? "factory " : ""}\
 ${dartConstructor.dartClass.name}${
       dartConstructor.name ? "." + dartConstructor.name : ""
-    }(${this.printParams(dartConstructor.params)})`;
+    }(${this.printParams(dartConstructor.params)})${
+      dartConstructor.body ?? ";"
+    }`;
   };
 
   printField = (dartField: DartField): string => {
@@ -128,14 +130,14 @@ ${dartFunction.body ?? ";"}`;
         const open =
           state && state !== prev ? (state === "named" ? "{" : "[") : "";
         const close = isLast && state ? (state === "named" ? "}" : "]") : "";
-        return `${open}${b}${close}`;
+        return `${open}${b},${close}`;
       })
-      .join(", ");
+      .join("");
   };
 
   printConstructorParam = (dartParam: DartConstructorParam): string => {
     return `\
-${dartParam.isRequired ? "required " : ""}\
+${dartParam.isNamed && dartParam.isRequired ? "required " : ""}\
 ${dartParam.type ? dartParam.type + " " : ""}\
 ${!dartParam.dartConstructor.isFactory && dartParam.isSuper ? "super." : ""}\
 ${!dartParam.dartConstructor.isFactory && dartParam.isThis ? "this." : ""}\
@@ -145,7 +147,7 @@ ${dartParam.defaultValue ? " = " + dartParam.defaultValue : ""}`;
 
   printParam = (dartParam: DartFunctionParam): string => {
     return `\
-${dartParam.isRequired ? "required " : ""}\
+${dartParam.isNamed && dartParam.isRequired ? "required " : ""}\
 ${dartParam.type ? dartParam.type + " " : ""}\
 ${dartParam.name}\
 ${dartParam.defaultValue ? " = " + dartParam.defaultValue : ""}`;

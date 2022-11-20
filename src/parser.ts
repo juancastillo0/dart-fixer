@@ -395,6 +395,7 @@ export interface DartConstructorData extends DartConstructorSpec {
   name: string | null;
   params: Array<DartConstructorParam>;
   dartClass: DartClass | DartEnum;
+  body: string | null;
 }
 
 export class DartConstructor implements DartConstructorData {
@@ -415,6 +416,7 @@ export class DartConstructor implements DartConstructorData {
   name: string | null;
   params: Array<DartConstructorParam>;
   dartClass: DartClass | DartEnum;
+  body: string | null;
 
   constructor(
     match: RegExpMatchArray | DartConstructorData,
@@ -444,11 +446,13 @@ export class DartConstructor implements DartConstructorData {
             this
           )
       );
+      this.body = null;
     } else {
       this.isConst = match.isConst;
       this.isFactory = match.isFactory;
       this.name = match.name;
       this.params = match.params;
+      this.body = match.body;
     }
   }
 }

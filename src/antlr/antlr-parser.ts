@@ -861,10 +861,12 @@ function setClassMemberLists(
     dartClass.constructors.push(
       ...classMemberDefinitions.filter(isConstructor).map((m) => {
         const context = getConstructor(m);
-
+        const body = ctx.getIntervalText(context.redirectionOrInitializers);
         const dartConstructor = new DartConstructor(
           {
             dartClass,
+            // TODO: verify `;`
+            body: body ? `${body};` : null,
             isConst:
               "CONST" in context.constructorSignature &&
               !!context.constructorSignature.CONST(),
@@ -916,6 +918,7 @@ function setClassMemberLists(
           name: null,
           isFactory: false,
           params: [],
+          body: v.dartFunction.body,
         },
         dartClass
       );
