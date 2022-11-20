@@ -656,6 +656,7 @@ export interface DartFunctionData {
   returnType: string | null;
   params: Array<DartFunctionParam>;
   generics: string | null;
+  body: string | null;
 }
 
 export class DartFunction implements DartFunctionData {
@@ -679,6 +680,7 @@ export class DartFunction implements DartFunctionData {
   dartClass: DartTypeScope | null;
   generics: string | null;
   match: RegExpMatchArray | undefined;
+  body: string | null;
 
   constructor(
     match: RegExpMatchArray | DartFunctionData,
@@ -718,6 +720,7 @@ export class DartFunction implements DartFunctionData {
           DartFunctionParam.parameterRegExp
         ),
       ].map((p) => new DartFunctionParam({ match: p, options: state }, this));
+      this.body = null;
     } else {
       this.isStatic = match.isStatic;
       this.isExternal = match.isExternal;
@@ -728,6 +731,7 @@ export class DartFunction implements DartFunctionData {
       this.returnType = match.returnType;
       this.params = match.params;
       this.generics = match.generics;
+      this.body = match.body;
     }
   }
 }

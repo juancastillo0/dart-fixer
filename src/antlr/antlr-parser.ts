@@ -462,6 +462,7 @@ const mapFunction = (
 
   const dartFunction = new DartFunction(
     {
+      body: ctx.getIntervalText(context.functionBody()),
       isGetter: signature instanceof GetterSignatureContext,
       isSetter: signature instanceof SetterSignatureContext,
       isOperator: signature instanceof OperatorSignatureContext,
@@ -607,6 +608,7 @@ export const getMethodSignature = (
 
   return signature;
 };
+
 const getAntlrFunction = (
   signature: AntlrFunctionContext,
   m: ClassMemberDefinitionContext | TopLevelDefinitionContext

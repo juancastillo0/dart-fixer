@@ -92,9 +92,8 @@ export class DartAnalyzer {
         });
         if (uri) {
           console.log("uri ", uri);
-          const doc = await vscode.workspace.openTextDocument(uri);
+          await vscode.workspace.openTextDocument(uri);
           // TODO:
-          console.log("uri file ", doc.getText());
         }
       }
       const generatedSections = getGeneratedSections(document);
