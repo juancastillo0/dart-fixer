@@ -11,7 +11,9 @@
   ],
   "activationEvents": [
     "onLanguage:dart",
-    "onCommand:dart-fixer.helloWorld"
+    "onLanguage:json",
+    "onCommand:dart-fixer.helloWorld",
+    "onCommand:dart-fixer.dartModelFromJTD"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -19,6 +21,10 @@
       {
         "command": "dart-fixer.helloWorld",
         "title": "Dart Fixer: Hello World"
+      },
+      {
+        "command": "dart-fixer.dartModelFromJTD",
+        "title": "Dart Fixer: Dart Model from JSON Type Definition"
       }
     ],
     "menus": {
@@ -26,12 +32,20 @@
         {
           "command": "dart-fixer.helloWorld",
           "when": "editorLangId == dart"
+        },
+        {
+          "command": "dart-fixer.dartModelFromJTD",
+          "when": "editorLangId == json"
         }
       ],
       "editor/context": [
         {
           "command": "dart-fixer.helloWorld",
           "when": "resourceLangId == dart"
+        },
+        {
+          "command": "dart-fixer.dartModelFromJTD",
+          "when": "editorLangId == json"
         }
       ]
     }

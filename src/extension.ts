@@ -3,10 +3,15 @@
 import * as vscode from "vscode";
 import { DartAnalyzer } from "./analyzer";
 import { createOutOfDateDiagnostic, GeneratedSection } from "./generator-utils";
+import {
+  createDartModelFromJTD,
+  JsonTypeDefinitionDartCodeActionProvider,
+} from "./json-type-definition/vscode-json-edit";
 import { generate, GenerationOptions } from "./printer";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
+const COMMAND_GENERATE_JTD = `${EXTENSION_NAME}.dartModelFromJTD`;
 
 const COMMAND_OBJECT: vscode.Command = {
   command: COMMAND,
@@ -42,6 +47,25 @@ export function activate(context: vscode.ExtensionContext): void {
       { language: "dart", scheme: "file" },
       new DartCodeActionProvider(fixerDiagnostics, analyzer),
       DartCodeActionProvider.metadata
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMAND_GENERATE_JTD, async () => {
+      const activeEditor = vscode.window.activeTextEditor;
+      if (!activeEditor) {
+        return;
+      }
+      const edit = createDartModelFromJTD(activeEditor.document);
+      return vscode.workspace.applyEdit(edit);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { language: "json", scheme: "file", pattern: "**/*.jtd.json" },
+      new JsonTypeDefinitionDartCodeActionProvider(fixerDiagnostics, analyzer),
+      JsonTypeDefinitionDartCodeActionProvider.metadata
     )
   );
 
