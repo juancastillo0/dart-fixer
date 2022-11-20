@@ -18,10 +18,11 @@ export const recase = (
       i !== 0
     ) {
       const sub = str.substring(prev, i + 1).replace(/[-_]+/g, "");
-      if (sub) {
+      const isSection = isConstantCase || sub.toUpperCase() !== sub;
+      if (sub && isSection) {
         sections.push(sub);
       }
-      prev = i + 1;
+      prev = isSection ? i + 1 : prev;
     }
     i++;
   }
