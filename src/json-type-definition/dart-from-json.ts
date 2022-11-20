@@ -1,5 +1,7 @@
 import {
   DartClass,
+  DartConstructor,
+  DartConstructorParam,
   DartEnum,
   DartField,
   DartFunction,
@@ -77,7 +79,7 @@ const dartClassFromJson = (
   });
 
   if ("properties" in schema || "optionalProperties" in schema) {
-    const c = new DartClass({
+    const dartClass = new DartClass({
       name: customName,
       bracket: anyBracket,
       constructors: [],
@@ -91,7 +93,7 @@ const dartClassFromJson = (
     });
     // TODO: const required = schema.properties ?? {};
 
-    c.fields.push(
+    dartClass.fields.push(
       ...Object.entries(
         Object.assign({}, schema.optionalProperties, schema.properties)
       ).map(([name, type]) => {
@@ -108,13 +110,13 @@ const dartClassFromJson = (
                 : typeValue.name) + (type.nullable ? "?" : ""),
             defaultValue: null,
           },
-          c
+          dartClass
         );
       })
     );
 
-    ctx.classes.set(c.name, c);
-    return c;
+    ctx.classes.set(dartClass.name, dartClass);
+    return dartClass;
   } else if ("ref" in schema) {
     // TODO: imports
     return { primitive: schema.ref };
@@ -173,7 +175,7 @@ const dartClassFromJson = (
       }>`,
     };
   } else if ("discriminator" in schema) {
-    const c = new DartClass({
+    const unionBaseClass = new DartClass({
       name: customName,
       bracket: anyBracket,
       constructors: [],
@@ -185,6 +187,19 @@ const dartClassFromJson = (
       methods: [],
       mixins: [],
     });
+    unionBaseClass.constructors.push(
+      new DartConstructor(
+        {
+          dartClass: unionBaseClass,
+          isConst: true,
+          isFactory: false,
+          name: null,
+          params: [],
+          body: null,
+        },
+        unionBaseClass
+      )
+    );
 
     const variants = Object.entries(schema.mapping).map(([name, type]) => {
       const variant = dartClassFromJson(addPathToCtx(name, ctx), type);
@@ -198,53 +213,53 @@ const dartClassFromJson = (
         );
       }
     });
-    // TODO: generate `map` method and variant factories;
+    // TODO: generate variant factories;
 
-    const func = new DartFunction(
+    const func = unionMapMethod({ maybe: false, unionBaseClass, variants });
+    unionBaseClass.methods.push(func);
+    const funcMaybe = unionMapMethod({ maybe: true, unionBaseClass, variants });
+    unionBaseClass.methods.push(funcMaybe);
+
+    const fromJsonFactory = new DartConstructor(
       {
-        generics: "<T>",
-        isExternal: false,
-        isGetter: false,
-        isSetter: false,
-        isOperator: false,
-        isStatic: false,
-        name: "map",
-        returnType: "T",
+        dartClass: unionBaseClass,
+        isConst: false,
+        isFactory: true,
+        name: "fromJson",
         params: [],
         body: `{
-final v = this;
-${variants
-  .map(
-    ({ name, variant }) => `\
-  if (v is ${recase(variant.name, "PascalCase")}) {
-    return ${recase(name, "camelCase")}(v);
-  }`
-  )
-  .join(" else ")}
-  throw StateError("Unknown variant for union ${customName} \${this}");
+  switch (json["${schema.discriminator}"] as String) {
+    ${variants
+      .map(
+        ({ name, variant }) => `
+    case "${name}":
+      return ${variant.name}.fromJson(json);`
+      )
+      .join("\n  ")}
+  }
+  throw StateError("Unknown variant for union ${unionBaseClass.name} \${json}");
 }`,
       },
-      c
+      unionBaseClass
     );
-    func.params.push(
-      ...variants.map(
-        ({ name, variant }) =>
-          new DartFunctionParam(
-            {
-              defaultValue: null,
-              isNamed: true,
-              isRequired: true,
-              name: recase(name, "camelCase"),
-              type: recase(variant.name, "PascalCase"),
-            },
-            func
-          )
+    fromJsonFactory.params.push(
+      new DartConstructorParam(
+        {
+          defaultValue: null,
+          isNamed: false,
+          isRequired: true,
+          isSuper: false,
+          isThis: false,
+          name: "json",
+          type: "Map",
+        },
+        fromJsonFactory
       )
     );
-    c.methods.push(func);
+    unionBaseClass.constructors.push(fromJsonFactory);
 
-    ctx.classes.set(c.name, c);
-    return c;
+    ctx.classes.set(unionBaseClass.name, unionBaseClass);
+    return unionBaseClass;
   } else {
     throw new Error(
       `Invalid JSON type definition schema (empty object): ${JSON.stringify(
@@ -252,4 +267,81 @@ ${variants
       )}`
     );
   }
+};
+
+const unionMapMethod = ({
+  maybe,
+  unionBaseClass,
+  variants,
+}: {
+  maybe: boolean;
+  unionBaseClass: DartClass;
+  variants: Array<{ variant: DartClass; name: string }>;
+}): DartFunction => {
+  const func = new DartFunction(
+    {
+      generics: "<T>",
+      isExternal: false,
+      isGetter: false,
+      isSetter: false,
+      isOperator: false,
+      isStatic: false,
+      name: `map${maybe ? "Maybe" : ""}`,
+      returnType: "T",
+      params: [],
+      body: `{
+final v = this;
+${variants
+  .map(
+    ({ name, variant }) => `\
+if (v is ${recase(variant.name, "PascalCase")}) {
+  return (${recase(name, "camelCase")} ${maybe ? " ?? orElse" : ""})(v);
+}`
+  )
+  .join(" else ")}
+${
+  maybe
+    ? "return orElse(v);"
+    : `throw StateError("Unknown variant for union ${unionBaseClass.name} \${this}");`
+}
+}`,
+    },
+    unionBaseClass
+  );
+  func.params.push(
+    ...variants.map(
+      ({ name, variant }) =>
+        new DartFunctionParam(
+          {
+            defaultValue: null,
+            isNamed: true,
+            isRequired: !maybe,
+            name: recase(name, "camelCase"),
+            type: `T Function(${recase(variant.name, "PascalCase")} ${recase(
+              name,
+              "camelCase"
+            )})${maybe ? "?" : ""}`,
+          },
+          func
+        )
+    )
+  );
+  if (maybe) {
+    func.params.push(
+      new DartFunctionParam(
+        {
+          defaultValue: null,
+          isNamed: true,
+          isRequired: true,
+          name: "orElse",
+          type: `T Function(${unionBaseClass.name} ${recase(
+            unionBaseClass.name,
+            "camelCase"
+          )})`,
+        },
+        func
+      )
+    );
+  }
+  return func;
 };
