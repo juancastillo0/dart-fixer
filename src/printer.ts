@@ -33,6 +33,20 @@ export interface GenerationOptions {
   };
 }
 
+export let question = "?";
+export let req = "required";
+
+// TODO: make it scoped
+export const setNullSafety = (params: { enabled: boolean }): void => {
+  if (params.enabled) {
+    question = "?";
+    req = "required";
+  } else {
+    question = "/*?*/";
+    req = "@required";
+  }
+};
+
 const defaultGenerationOptions: GenerationOptions = {
   fromJson: {},
   toJson: {},
@@ -157,7 +171,7 @@ const fromJsonValue = (
   const getter = options.getter ?? `json["${param!.name}"]`;
   const pType = param?.type ?? "dynamic";
   const dartType = options.dartType ?? new DartType(pType);
-  if (dartType.text === "dynamic" || dartType.text === "Object?") {
+  if (dartType.text === "dynamic" || dartType.text === `Object${question}`) {
     return getter;
   }
   const nullableCast = dartType.isNullable ? `${getter} == null ? null : ` : "";
@@ -190,7 +204,7 @@ const fromJsonValue = (
 
 export const generateToJson = (fieldsNotStatic: Array<DartField>): string => {
   return `
-Map<String, Object?> toJson() {
+Map<String, Object${question}> toJson() {
   return {
     ${fieldsNotStatic
       .map(
@@ -214,7 +228,7 @@ const toJsonValue = (f: {
   if (!dartType || dartType.isJson) {
     return f.name;
   }
-  const questionMark = dartType.isNullable ? "?" : "";
+  const questionMark = dartType.isNullable ? question : "";
   const getter = `${f.name}${questionMark}`;
   if (dartType.isMap) {
     return `${getter}.map((k, v) => MapEntry(k.toString(), ${toJsonValue({
@@ -286,7 +300,7 @@ ${dartClass.name} copyWith({
     dartConstructor.params.map((p) => ({
       name: p.name,
       value: `${p.name} ?? ${
-        p.type?.trim().endsWith("?")
+        p.type?.trim()?.endsWith("?")
           ? `(${p.name}ToNull ? null : this.${p.name})`
           : `this.${p.name}`
       }`,
@@ -298,7 +312,7 @@ ${dartClass.name} copyWith({
 }
 
 @override
-bool operator ==(Object? other) {
+bool operator ==(Object${question} other) {
   return identical(other, this) || other is ${
     dartClass.name
   } && other.runtimeType == runtimeType
@@ -328,7 +342,7 @@ export const generateAllFieldsGetter = (
   fieldsNotStatic: Array<DartField>
 ): string => {
   return `
-List<Object?> get allFields => [
+List<Object${question}> get allFields => [
   ${fieldsNotStatic.map((p) => `${p.name},`).join("\n  ")}
 ];
 `;
@@ -352,11 +366,11 @@ enum ${className}Fields {
   final String type;
   final bool isFinal;
   final bool isVariable;
-  final Object? defaultValue;
+  final Object${question} defaultValue;
 
   bool get isNullable => type.endsWith("?");
 
-  Object? get(${className} object) {
+  Object${question} get(${className} object) {
     switch (this) {
       ${dartClass.fieldsNotStatic
         .map(
@@ -366,13 +380,13 @@ enum ${className}Fields {
     }
   }
 
-  const ${className}Fields(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
+  const ${className}Fields(this.type, {${req} this.isFinal, ${req} this.isVariable, this.defaultValue,});
 }
 `;
 };
 
 const nullableType = (type: string | null): string =>
-  `${!type?.endsWith("?") ? `${type ?? "Object"}?` : type}`;
+  `${!type?.endsWith("?") ? `${type ?? "Object"}${question}` : type}`;
 
 export const generateBuilder = (
   dartClass: DartClass,
@@ -414,7 +428,7 @@ class ${className} {
       .join(" && ")};
   }
 
-  ${dartClass.name}? tryToValue() {
+  ${dartClass.name}${question} tryToValue() {
     if (!isValidValue) {
       return null;
     }

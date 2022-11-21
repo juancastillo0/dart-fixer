@@ -9,6 +9,7 @@ import {
   DartFunctionParam,
   DartMixin,
 } from "./parser";
+import { req } from "./printer";
 
 export class DartModelPrinter {
   printClass = (dartClass: DartClass): string => {
@@ -137,7 +138,7 @@ ${dartFunction.body ?? ";"}`;
 
   printConstructorParam = (dartParam: DartConstructorParam): string => {
     return `\
-${dartParam.isNamed && dartParam.isRequired ? "required " : ""}\
+${dartParam.isNamed && dartParam.isRequired ? `${req} ` : ""}\
 ${dartParam.type ? dartParam.type + " " : ""}\
 ${!dartParam.dartConstructor.isFactory && dartParam.isSuper ? "super." : ""}\
 ${!dartParam.dartConstructor.isFactory && dartParam.isThis ? "this." : ""}\
@@ -147,7 +148,7 @@ ${dartParam.defaultValue ? " = " + dartParam.defaultValue : ""}`;
 
   printParam = (dartParam: DartFunctionParam): string => {
     return `\
-${dartParam.isNamed && dartParam.isRequired ? "required " : ""}\
+${dartParam.isNamed && dartParam.isRequired ? `${req} ` : ""}\
 ${dartParam.type ? dartParam.type + " " : ""}\
 ${dartParam.name}\
 ${dartParam.defaultValue ? " = " + dartParam.defaultValue : ""}`;

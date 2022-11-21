@@ -7,6 +7,7 @@ import {
   DartFunction,
   DartFunctionParam,
 } from "../parser";
+import { question } from "../printer";
 import { recase } from "../utils";
 import { SomeJTDSchemaType } from "./schema";
 
@@ -107,7 +108,7 @@ const dartClassFromJson = (
             type:
               ("primitive" in typeValue
                 ? typeValue.primitive
-                : typeValue.name) + (type.nullable ? "?" : ""),
+                : typeValue.name) + (type.nullable ? question : ""),
             defaultValue: null,
           },
           dartClass
@@ -231,7 +232,7 @@ const dartClassFromJson = (
   switch (json["${schema.discriminator}"] as String) {
     ${variants
       .map(
-        ({ name, variant }) => `
+        ({ name, variant }) => `\
     case "${name}":
       return ${variant.name}.fromJson(json);`
       )
@@ -295,7 +296,11 @@ ${variants
   .map(
     ({ name, variant }) => `\
 if (v is ${recase(variant.name, "PascalCase")}) {
-  return (${recase(name, "camelCase")} ${maybe ? " ?? orElse" : ""})(v);
+  return ${
+    maybe
+      ? `(${recase(name, "camelCase")} ?? orElse)`
+      : recase(name, "camelCase")
+  }(v);
 }`
   )
   .join(" else ")}
@@ -320,7 +325,7 @@ ${
             type: `T Function(${recase(variant.name, "PascalCase")} ${recase(
               name,
               "camelCase"
-            )})${maybe ? "?" : ""}`,
+            )})${maybe ? question : ""}`,
           },
           func
         )
