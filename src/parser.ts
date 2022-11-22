@@ -5,12 +5,6 @@ import {
   getBrackets,
 } from "./parser-utils";
 
-interface RegExpMatchArray extends Array<string> {
-  index?: number;
-  input?: string;
-  groups?: Record<string, string | undefined>;
-}
-
 export interface DartParserConfig {
   packageName?: string;
 }
@@ -40,17 +34,20 @@ export class DartImports implements DartImportsData {
   readonly cleanText: CleanedText;
   readonly config: DartParserConfig;
 
-  constructor(text: DartImportsData, config?: DartParserConfig) {
+  constructor(
+    text: Partial<DartImportsData> & { cleanText: CleanedText },
+    config?: DartParserConfig
+  ) {
     this.config = config ?? {};
-    this.imports = text.imports;
-    this.classes = text.classes;
-    this.functions = text.functions;
+    this.imports = text.imports ?? [];
+    this.classes = text.classes ?? [];
+    this.functions = text.functions ?? [];
     this.cleanText = text.cleanText;
-    this.enums = text.enums;
-    this.mixins = text.mixins;
-    this.extensions = text.extensions;
-    this.fields = text.fields;
-    this.typeAliases = text.typeAliases;
+    this.enums = text.enums ?? [];
+    this.mixins = text.mixins ?? [];
+    this.extensions = text.extensions ?? [];
+    this.fields = text.fields ?? [];
+    this.typeAliases = text.typeAliases ?? [];
   }
 
   get hasImports(): boolean {
@@ -75,7 +72,7 @@ export interface DartImportData {
   path: string;
 }
 
-export class DartImport {
+export class DartImport implements DartImportData {
   isExport: boolean;
   hide: Array<string>;
   show: Array<string>;
@@ -95,11 +92,14 @@ export class DartImport {
     return this.path.startsWith(`dart:`);
   }
 
-  constructor(params: DartImportData, config: DartParserConfig | undefined) {
+  constructor(
+    params: Partial<DartImportData> & { isExport: boolean; path: string },
+    config: DartParserConfig | undefined
+  ) {
     this.isExport = params.isExport;
-    this.hide = params.hide;
-    this.show = params.show;
-    this.as = params.as;
+    this.hide = params.hide ?? [];
+    this.show = params.show ?? [];
+    this.as = params.as ?? null;
     this.path = params.path;
 
     this.isOwnPackage =
@@ -123,7 +123,7 @@ export interface DartClassData {
   constructors: Array<DartConstructor>;
   fields: Array<DartField>;
   methods: Array<DartFunction>;
-  bracket: BracketWithOriginal;
+  bracket: BracketWithOriginal | null;
 }
 
 export class DartClass implements DartClassData {
@@ -136,7 +136,7 @@ export class DartClass implements DartClassData {
   constructors: Array<DartConstructor>;
   fields: Array<DartField>;
   methods: Array<DartFunction> = [];
-  bracket: BracketWithOriginal;
+  bracket: BracketWithOriginal | null;
 
   get fieldsNotStatic(): Array<DartField> {
     return this.fields.filter((p) => !p.isStatic);
@@ -149,17 +149,22 @@ export class DartClass implements DartClassData {
     );
   }
 
-  constructor(opts: DartClassData) {
-    this.isAbstract = opts.isAbstract;
+  constructor(
+    opts: Partial<DartClassData> & {
+      name: string;
+      bracket: BracketWithOriginal | null;
+    }
+  ) {
+    this.isAbstract = opts.isAbstract ?? false;
     this.name = opts.name;
-    this.generics = opts.generics;
-    this.extendsBound = opts.extendsBound;
-    this.constructors = opts.constructors;
-    this.fields = opts.fields;
-    this.methods = opts.methods;
+    this.generics = opts.generics ?? null;
+    this.extendsBound = opts.extendsBound ?? null;
+    this.constructors = opts.constructors ?? [];
+    this.fields = opts.fields ?? [];
+    this.methods = opts.methods ?? [];
     this.bracket = opts.bracket;
-    this.interfaces = opts.interfaces;
-    this.mixins = opts.mixins;
+    this.interfaces = opts.interfaces ?? [];
+    this.mixins = opts.mixins ?? [];
   }
 }
 
@@ -227,13 +232,20 @@ export class DartConstructor implements DartConstructorData {
   dartClass: DartClass | DartEnum;
   body: string | null;
 
-  constructor(match: DartConstructorData, dartClass: DartClass | DartEnum) {
-    this.dartClass = dartClass;
-    this.isConst = match.isConst;
-    this.isFactory = match.isFactory;
-    this.name = match.name;
-    this.params = match.params;
-    this.body = match.body;
+  constructor(
+    params: Partial<DartConstructorData> & {
+      name: string | null;
+      isConst: boolean;
+      isFactory: boolean;
+      dartClass: DartClass | DartEnum;
+    }
+  ) {
+    this.dartClass = params.dartClass;
+    this.isConst = params.isConst;
+    this.isFactory = params.isFactory;
+    this.name = params.name;
+    this.params = params.params ?? [];
+    this.body = params.body ?? null;
   }
 }
 
@@ -270,18 +282,22 @@ export class DartConstructorParam implements DartConstructorParamData {
   name: string;
   type: string | null;
   dartConstructor: DartConstructor;
-  match: RegExpMatchArray | undefined;
 
   constructor(
-    params: DartConstructorParamData,
+    params: Partial<DartConstructorParamData> & {
+      isRequired: boolean;
+      isNamed: boolean;
+      name: string;
+      type: string | null;
+    },
     dartConstructor: DartConstructor
   ) {
     this.dartConstructor = dartConstructor;
-    this.isThis = params.isThis;
-    this.isSuper = params.isSuper;
+    this.isThis = params.isThis ?? false;
+    this.isSuper = params.isSuper ?? false;
     this.isRequired = params.isRequired;
     this.isNamed = params.isNamed;
-    this.defaultValue = params.defaultValue;
+    this.defaultValue = params.defaultValue ?? null;
     this.name = params.name;
     this.type = params.type;
 
@@ -312,14 +328,22 @@ export class DartField implements DartFieldOrParam {
   defaultValue: string | null;
   dartClass: DartTypeScope | null;
 
-  constructor(match: DartFieldData, dartClass: DartTypeScope | null) {
+  constructor(
+    params: Partial<DartFieldData> & {
+      isFinal: boolean;
+      name: string;
+      isVariable: boolean;
+      type: string | null;
+    },
+    dartClass: DartTypeScope | null
+  ) {
     this.dartClass = dartClass;
-    this.isStatic = match.isStatic;
-    this.isFinal = match.isFinal;
-    this.name = match.name;
-    this.isVariable = match.isVariable;
-    this.type = match.type;
-    this.defaultValue = match.defaultValue;
+    this.isStatic = params.isStatic ?? false;
+    this.isFinal = params.isFinal;
+    this.name = params.name;
+    this.isVariable = params.isVariable;
+    this.type = params.type;
+    this.defaultValue = params.defaultValue ?? null;
   }
 }
 
@@ -330,7 +354,6 @@ export class DartFunctionParam implements DartParam {
   name: string;
   type: string | null;
   dartFunction: DartFunction;
-  match: RegExpMatchArray | undefined;
 
   constructor(params: DartParam, dartFunction: DartFunction) {
     this.dartFunction = dartFunction;
@@ -366,21 +389,26 @@ export class DartFunction implements DartFunctionData {
   params: Array<DartFunctionParam>;
   dartClass: DartTypeScope | null;
   generics: string | null;
-  match: RegExpMatchArray | undefined;
   body: string | null;
 
-  constructor(match: DartFunctionData, dartClass: DartTypeScope | null) {
+  constructor(
+    params: Partial<DartFunctionData> & {
+      name: string;
+      returnType: string | null;
+    },
+    dartClass: DartTypeScope | null
+  ) {
     this.dartClass = dartClass;
-    this.isStatic = match.isStatic;
-    this.isExternal = match.isExternal;
-    this.isGetter = match.isGetter;
-    this.isSetter = match.isSetter;
-    this.isOperator = match.isOperator;
-    this.name = match.name;
-    this.returnType = match.returnType;
-    this.params = match.params;
-    this.generics = match.generics;
-    this.body = match.body;
+    this.isStatic = params.isStatic ?? false;
+    this.isExternal = params.isExternal ?? false;
+    this.isGetter = params.isGetter ?? false;
+    this.isSetter = params.isSetter ?? false;
+    this.isOperator = params.isOperator ?? false;
+    this.name = params.name;
+    this.returnType = params.returnType;
+    this.params = params.params ?? [];
+    this.generics = params.generics ?? null;
+    this.body = params.body ?? null;
   }
 }
 
