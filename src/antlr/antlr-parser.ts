@@ -862,26 +862,23 @@ function setClassMemberLists(
       ...classMemberDefinitions.filter(isConstructor).map((m) => {
         const context = getConstructor(m);
         const body = ctx.getIntervalText(context.redirectionOrInitializers);
-        const dartConstructor = new DartConstructor(
-          {
-            dartClass,
-            // TODO: verify `;`
-            body: body ? `${body};` : null,
-            isConst:
-              "CONST" in context.constructorSignature &&
-              !!context.constructorSignature.CONST(),
-            name:
-              context.constructorSignature.constructorName().identifier()
-                ?.text ?? null,
-            isFactory:
-              context.constructorSignature instanceof
-                RedirectingFactoryConstructorSignatureContext ||
-              context.constructorSignature instanceof
-                FactoryConstructorSignatureContext,
-            params: [],
-          },
-          dartClass
-        );
+        const dartConstructor = new DartConstructor({
+          dartClass,
+          // TODO: verify `;`
+          body: body ? `${body};` : null,
+          isConst:
+            "CONST" in context.constructorSignature &&
+            !!context.constructorSignature.CONST(),
+          name:
+            context.constructorSignature.constructorName().identifier()?.text ??
+            null,
+          isFactory:
+            context.constructorSignature instanceof
+              RedirectingFactoryConstructorSignatureContext ||
+            context.constructorSignature instanceof
+              FactoryConstructorSignatureContext,
+          params: [],
+        });
         dartConstructor.params.push(
           ...getParameters(
             context.constructorSignature.formalParameterList()
@@ -911,17 +908,14 @@ function setClassMemberLists(
         1
       );
 
-      const dartConstructor = new DartConstructor(
-        {
-          dartClass,
-          isConst: false,
-          name: null,
-          isFactory: false,
-          params: [],
-          body: v.dartFunction.body,
-        },
-        dartClass
-      );
+      const dartConstructor = new DartConstructor({
+        dartClass,
+        isConst: false,
+        name: null,
+        isFactory: false,
+        params: [],
+        body: v.dartFunction.body,
+      });
       dartConstructor.params.push(
         ...getParameters(v.method.formalParameterList!).map((p) => {
           const param = p.param;

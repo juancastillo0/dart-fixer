@@ -178,7 +178,7 @@ const dartClassFromJson = (
   } else if ("discriminator" in schema) {
     const unionBaseClass = new DartClass({
       name: customName,
-      bracket: anyBracket,
+      bracket: null,
       constructors: [],
       extendsBound: null,
       fields: [],
@@ -189,17 +189,14 @@ const dartClassFromJson = (
       mixins: [],
     });
     unionBaseClass.constructors.push(
-      new DartConstructor(
-        {
-          dartClass: unionBaseClass,
-          isConst: true,
-          isFactory: false,
-          name: null,
-          params: [],
-          body: null,
-        },
-        unionBaseClass
-      )
+      new DartConstructor({
+        dartClass: unionBaseClass,
+        isConst: true,
+        isFactory: false,
+        name: null,
+        params: [],
+        body: null,
+      })
     );
 
     const variants = Object.entries(schema.mapping).map(([name, type]) => {
@@ -221,14 +218,13 @@ const dartClassFromJson = (
     const funcMaybe = unionMapMethod({ maybe: true, unionBaseClass, variants });
     unionBaseClass.methods.push(funcMaybe);
 
-    const fromJsonFactory = new DartConstructor(
-      {
-        dartClass: unionBaseClass,
-        isConst: false,
-        isFactory: true,
-        name: "fromJson",
-        params: [],
-        body: `{
+    const fromJsonFactory = new DartConstructor({
+      dartClass: unionBaseClass,
+      isConst: false,
+      isFactory: true,
+      name: "fromJson",
+      params: [],
+      body: `{
   switch (json["${schema.discriminator}"] as String) {
     ${variants
       .map(
@@ -240,9 +236,7 @@ const dartClassFromJson = (
   }
   throw StateError("Unknown variant for union ${unionBaseClass.name} \${json}");
 }`,
-      },
-      unionBaseClass
-    );
+    });
     fromJsonFactory.params.push(
       new DartConstructorParam(
         {

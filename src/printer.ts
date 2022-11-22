@@ -105,17 +105,14 @@ const makeConstructorFromFields = (
   dartClass: DartClass,
   opts?: { body?: string; name?: string }
 ): DartConstructor => {
-  const classConstructor = new DartConstructor(
-    {
-      isConst: dartClass.fieldsNotStatic.every((f) => f.isFinal),
-      isFactory: false,
-      name: opts?.name ?? null,
-      params: [],
-      dartClass,
-      body: opts?.body ?? null,
-    },
-    dartClass
-  );
+  const classConstructor = new DartConstructor({
+    isConst: dartClass.fieldsNotStatic.every((f) => f.isFinal),
+    isFactory: false,
+    name: opts?.name ?? null,
+    params: [],
+    dartClass,
+    body: opts?.body ?? null,
+  });
   classConstructor.params.push(
     ...dartClass.fieldsNotStatic.map(
       (f) =>
