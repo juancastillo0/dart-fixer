@@ -9,42 +9,25 @@ import {
 } from "../parser";
 import { question } from "../printer";
 import { recase } from "../utils";
-import { SomeJTDSchemaType } from "./schema";
+import { SomeJTDSchemaType } from "./schema-type";
 
-interface JsonSchemaCtx {
+export interface JsonSchemaCtx {
   classes: Map<string, DartClass>;
   enums: Map<string, DartEnum>;
+  typeById: Map<string, DartEnum | DartClass | string>;
   primitiveRefs: Map<string, string>;
   imports: Map<string, Array<string>>;
   path: Array<string>;
 }
 
-const anyBracket = {
-  start: 0,
-  end: 0,
-  children: [],
-  originalEnd: {
-    column: 0,
-    index: 0,
-    line: 0,
-  },
-  originalStart: {
-    column: 0,
-    index: 0,
-    line: 0,
-  },
-};
-
-const addPathToCtx = (
+export const addPathToCtx = (
   customName: string,
   ctx: JsonSchemaCtx
 ): JsonSchemaCtx => {
-  return customName
-    ? { ...ctx, path: [...ctx.path, recase(customName, "PascalCase")] }
-    : ctx;
+  return customName ? { ...ctx, path: [...ctx.path, customName] } : ctx;
 };
 
-export const dartTypeFromSchema = (
+export const dartTypeFromJsonTypeDefinition = (
   schema: SomeJTDSchemaType,
   path: Array<string>
 ): {
@@ -56,7 +39,8 @@ export const dartTypeFromSchema = (
     enums: new Map(),
     primitiveRefs: new Map(),
     imports: new Map(),
-    path: path.map((p) => recase(p, "PascalCase")),
+    typeById: new Map(),
+    path,
   };
   return { value: dartClassFromJson(ctx, schema), ctx };
 };
@@ -69,7 +53,7 @@ const dartClassFromJson = (
 
   ctx = addPathToCtx(customName, ctx);
   if (!customName) {
-    customName = ctx.path.join("");
+    customName = ctx.path.map((p) => recase(p, "PascalCase")).join("");
   }
 
   Object.entries(schema.definitions ?? {}).forEach(([name, type]) => {
@@ -82,7 +66,7 @@ const dartClassFromJson = (
   if ("properties" in schema || "optionalProperties" in schema) {
     const dartClass = new DartClass({
       name: customName,
-      bracket: anyBracket,
+      bracket: null,
       constructors: [],
       extendsBound: null,
       fields: [],
@@ -92,7 +76,7 @@ const dartClassFromJson = (
       methods: [],
       mixins: [],
     });
-    // TODO: const required = schema.properties ?? {};
+    const required = new Set(Object.keys(schema.properties ?? {}));
 
     dartClass.fields.push(
       ...Object.entries(
@@ -108,7 +92,8 @@ const dartClassFromJson = (
             type:
               ("primitive" in typeValue
                 ? typeValue.primitive
-                : typeValue.name) + (type.nullable ? question : ""),
+                : typeValue.name) +
+              (type.nullable || !required.has(name) ? question : ""),
             defaultValue: null,
           },
           dartClass
