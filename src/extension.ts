@@ -4,14 +4,17 @@ import * as vscode from "vscode";
 import { DartAnalyzer } from "./analyzer";
 import { createOutOfDateDiagnostic, GeneratedSection } from "./generator-utils";
 import {
-  createDartModelFromJTD,
+  executeJsonToDartCommand,
+  JsonFileKind,
   JsonTypeDefinitionDartCodeActionProvider,
 } from "./json-type-definition/vscode-json-edit";
 import { generate, GenerationOptions } from "./printer";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
-export const COMMAND_GENERATE_JTD = `${EXTENSION_NAME}.dartModelFromJTD`;
+export const COMMAND_GENERATE_JSON_TYPE_DEFINITION = `${EXTENSION_NAME}.dartModelFromJTD`;
+export const COMMAND_GENERATE_JSON_SCHEMA = `${EXTENSION_NAME}.dartModelFromJsonSchema`;
+export const COMMAND_GENERATE_JSON_DOCUMENT = `${EXTENSION_NAME}.dartModelFromJsonDocument`;
 
 const COMMAND_OBJECT: vscode.Command = {
   command: COMMAND,
@@ -51,19 +54,19 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_GENERATE_JTD, async () => {
-      const activeEditor = vscode.window.activeTextEditor;
-      if (!activeEditor) {
-        return;
-      }
-      const edit = createDartModelFromJTD(activeEditor.document);
-      const success = await vscode.workspace.applyEdit(edit);
-      if (success) {
-        await vscode.window.showTextDocument(edit.entries()[0][0]);
-        return vscode.commands.executeCommand("editor.action.formatDocument");
-      }
-      return false;
-    })
+    vscode.commands.registerCommand(COMMAND_GENERATE_JSON_TYPE_DEFINITION, () =>
+      executeJsonToDartCommand(JsonFileKind.typeDefinition)
+    )
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMAND_GENERATE_JSON_SCHEMA, () =>
+      executeJsonToDartCommand(JsonFileKind.schema)
+    )
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMAND_GENERATE_JSON_DOCUMENT, () =>
+      executeJsonToDartCommand(JsonFileKind.document)
+    )
   );
 
   context.subscriptions.push(
@@ -136,8 +139,8 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
     const diagnostics: Array<vscode.Diagnostic> = [];
 
     for (const dartClass of data.values.classes) {
-      const originalStart = dartClass.bracket.originalStart;
-      const originalEnd = dartClass.bracket.originalEnd;
+      const originalStart = dartClass.bracket!.originalStart;
+      const originalEnd = dartClass.bracket!.originalEnd;
       const classRange = new vscode.Range(
         originalStart.line,
         originalStart.column,

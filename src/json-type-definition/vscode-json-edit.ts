@@ -1,9 +1,15 @@
 import * as vscode from "vscode";
 import { DartAnalyzer } from "../analyzer";
 import { DartModelPrinter } from "../dart-model-printer";
-import { COMMAND_GENERATE_JTD } from "../extension";
-import { dartTypeFromSchema } from "../json-type-definition/dart-from-json";
-import { SomeJTDSchemaType } from "../json-type-definition/schema";
+import { COMMAND_GENERATE_JSON_TYPE_DEFINITION } from "../extension";
+import { dartTypeFromJsonSchema } from "../json-schema/dart-from-schema";
+import { quicktypeJSON } from "../json-schema/schema-from-document";
+import { SomeJSONSchema } from "../json-schema/schema-type";
+import {
+  dartTypeFromJsonTypeDefinition,
+  JsonSchemaCtx,
+} from "../json-type-definition/dart-from-json";
+import { SomeJTDSchemaType } from "./schema-type";
 import { generate } from "../printer";
 
 export class JsonTypeDefinitionDartCodeActionProvider
@@ -31,7 +37,7 @@ export class JsonTypeDefinitionDartCodeActionProvider
       );
       action.isPreferred = true;
       action.command = {
-        command: COMMAND_GENERATE_JTD,
+        command: COMMAND_GENERATE_JSON_TYPE_DEFINITION,
         title: "Dart Fixer: Dart Model from JSON Type Definition",
         tooltip: "Generate Dart Model from JSON Type Definition",
       };
@@ -43,21 +49,96 @@ export class JsonTypeDefinitionDartCodeActionProvider
   }
 }
 
-export const createDartModelFromJTD = (
-  document: vscode.TextDocument
-): vscode.WorkspaceEdit => {
-  const value = JSON.parse(document.getText()) as SomeJTDSchemaType;
-  const fileName = document.uri.path.substring(
-    document.uri.path.lastIndexOf("/") + 1
-  );
-  const name = fileName.substring(0, fileName.length - ".jtd.json".length);
-  const dartType = dartTypeFromSchema(value, [name]);
+export enum JsonFileKind {
+  document,
+  schema,
+  typeDefinition,
+}
+
+export const executeJsonToDartCommand = async (
+  jsonKind: JsonFileKind,
+  options?: { fromClipboard?: true }
+): Promise<boolean> => {
+  const activeEditor = vscode.window.activeTextEditor;
+  if (!activeEditor) {
+    return false;
+  }
+  let params: JsonEditParams | undefined;
+  if (options?.fromClipboard) {
+    const text = await vscode.env.clipboard.readText();
+    // TODO: use current dart file
+    // let newFile = activeEditor.document.uri;
+    // if (!activeEditor.document.uri.path.endsWith(".dart")) {
+    // Ask the user for a file
+    // TODO: do this afterwards
+    const doc = await vscode.workspace.openTextDocument({ language: "dart" });
+    const newFile = doc.uri;
+    // }
+    params = { text, newFile };
+  }
+  /// vscode.env.clipboard.readText()
+  try {
+    const edit = await createDartModelFromJTD(
+      params ?? activeEditor.document,
+      jsonKind
+    );
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) {
+      await vscode.window.showTextDocument(edit.entries()[0][0]);
+      await vscode.commands.executeCommand("editor.action.formatDocument");
+      return true;
+    }
+  } catch (error) {
+    console.log(error);
+  }
+  return false;
+};
+
+interface JsonEditParams {
+  text: string;
+  newFile: vscode.Uri;
+}
+
+export const createDartModelFromJTD = async (
+  document: vscode.TextDocument | JsonEditParams,
+  kind: JsonFileKind
+): Promise<vscode.WorkspaceEdit> => {
+  const isText = "newFile" in document;
+  const text = isText ? document.text : document.getText();
+  const uri = isText ? document.newFile : document.uri;
+  const fileName = uri.path.substring(uri.path.lastIndexOf("/") + 1);
+  const name = fileName.substring(0, fileName.indexOf("."));
+  const newFile = isText
+    ? document.newFile
+    : vscode.Uri.joinPath(document.uri, "..", `${name}.dart`);
+  const path = [name];
+  // TODO: find best way to order fields from "properties" and "optionalProperties"
+
+  let ctx: JsonSchemaCtx;
+  switch (kind) {
+    case JsonFileKind.typeDefinition: {
+      ctx = dartTypeFromJsonTypeDefinition(
+        JSON.parse(text) as SomeJTDSchemaType,
+        path
+      ).ctx;
+      break;
+    }
+    case JsonFileKind.schema: {
+      ctx = dartTypeFromJsonSchema(JSON.parse(text) as SomeJSONSchema, path);
+      break;
+    }
+    case JsonFileKind.document: {
+      const schema = await quicktypeJSON(name, text);
+      ctx = dartTypeFromJsonSchema(schema, path);
+      break;
+    }
+  }
 
   const printer = new DartModelPrinter();
-  const classes = [...dartType.ctx.classes.values()];
-  const text = `\
+  const classes = [...ctx.classes.values()];
+  const dartFileText = `\
 // generated from "./${fileName}"
-${[...dartType.ctx.imports.values()].join("\n")}\
+${[...ctx.imports.values()].join("\n")}\
 
 ${classes
   .map(printer.printClass)
@@ -68,15 +149,14 @@ ${classes
       : `${c.substring(0, c.length - 1)}${generate(classes[i], {}).content}`
   )
   .join("\n\n")}\
-${[...dartType.ctx.enums.values()].map(printer.printEnum).join("\n\n")}\
-${[...dartType.ctx.primitiveRefs.entries()]
+${[...ctx.enums.values()].map(printer.printEnum).join("\n\n")}\
+${[...ctx.primitiveRefs.entries()]
   .map(([name, type]) => `typedef ${name} = ${type};`)
   .join("\n\n")}
 `;
 
   const edit = new vscode.WorkspaceEdit();
-  const newFile = vscode.Uri.joinPath(document.uri, "..", `${name}.dart`);
   edit.createFile(newFile, { overwrite: true });
-  edit.insert(newFile, new vscode.Position(0, 0), text);
+  edit.insert(newFile, new vscode.Position(0, 0), dartFileText);
   return edit;
 };

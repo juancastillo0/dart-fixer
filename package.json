@@ -13,7 +13,9 @@
     "onLanguage:dart",
     "onLanguage:json",
     "onCommand:dart-fixer.helloWorld",
-    "onCommand:dart-fixer.dartModelFromJTD"
+    "onCommand:dart-fixer.dartModelFromJTD",
+    "onCommand:dart-fixer.dartModelFromJsonSchema",
+    "onCommand:dart-fixer.dartModelFromJsonDocument"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -25,6 +27,14 @@
       {
         "command": "dart-fixer.dartModelFromJTD",
         "title": "Dart Fixer: Dart Model from JSON Type Definition"
+      },
+      {
+        "command": "dart-fixer.dartModelFromJsonSchema",
+        "title": "Dart Fixer: Dart Model from JSON Schema"
+      },
+      {
+        "command": "dart-fixer.dartModelFromJsonDocument",
+        "title": "Dart Fixer: Dart Model from JSON Model Document"
       }
     ],
     "menus": {
@@ -36,6 +46,14 @@
         {
           "command": "dart-fixer.dartModelFromJTD",
           "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.dartModelFromJsonSchema",
+          "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.dartModelFromJsonDocument",
+          "when": "editorLangId == json"
         }
       ],
       "editor/context": [
@@ -45,6 +63,14 @@
         },
         {
           "command": "dart-fixer.dartModelFromJTD",
+          "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.dartModelFromJsonSchema",
+          "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.dartModelFromJsonDocument",
           "when": "editorLangId == json"
         }
       ]
