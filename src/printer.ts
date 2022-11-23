@@ -397,6 +397,10 @@ export const generateBuilder = (
     return "";
   }
   const className = `${dartClass.name}Builder`;
+  const requiredFields = fields.filter(
+    (p) => p.type && !p.type.trim().endsWith("?")
+  );
+  const noRequired = requiredFields.length === 0;
   return `
 class ${className} {
   ${fields
@@ -419,16 +423,23 @@ class ${className} {
     .join("\n")}
 
   bool get isValidValue {
-    return ${fields
-      .filter((p) => p.type && !p.type.trim().endsWith("?"))
-      .map((p) => `${p.name} != null`)
-      .join(" && ")};
+    return ${
+      noRequired
+        ? "true"
+        : requiredFields.map((p) => `${p.name} != null`).join(" && ")
+    };
   }
 
-  ${dartClass.name}${question} tryToValue() {
+  ${dartClass.name}${noRequired ? "" : question} tryToValue() {\
+${
+  noRequired
+    ? ""
+    : `
     if (!isValidValue) {
       return null;
     }
+`
+}\
     return ${instantiateConstructor(
       dartConstructor,
       fields.map((f) => ({

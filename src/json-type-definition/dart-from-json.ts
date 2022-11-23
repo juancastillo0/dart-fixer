@@ -6,6 +6,7 @@ import {
   DartField,
   DartFunction,
   DartFunctionParam,
+  toDartIdentifier,
 } from "../parser";
 import { question } from "../printer";
 import { recase } from "../utils";
@@ -67,20 +68,12 @@ const dartClassFromJson = (
     const dartClass = new DartClass({
       name: customName,
       bracket: null,
-      constructors: [],
-      extendsBound: null,
-      fields: [],
-      generics: null,
-      interfaces: [],
-      isAbstract: false,
-      methods: [],
-      mixins: [],
     });
     const required = new Set(Object.keys(schema.properties ?? {}));
 
     dartClass.fields.push(
       ...Object.entries(
-        Object.assign({}, schema.optionalProperties, schema.properties)
+        Object.assign({}, schema.properties, schema.optionalProperties)
       ).map(([name, type]) => {
         const typeValue = dartClassFromJson(addPathToCtx(name, ctx), type);
         return new DartField(
