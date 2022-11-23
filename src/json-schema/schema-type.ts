@@ -164,7 +164,7 @@ export type JSONSchemaType<T> = StrictNullChecksWrapper<
   UncheckedJSONSchemaType<T, false>
 >;
 
-type Known =
+export type Known =
   | { [key: string]: Known }
   | [Known, ...Known[]]
   | Known[]
