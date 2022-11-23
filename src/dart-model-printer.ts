@@ -41,8 +41,20 @@ ${
     : ""
 }\
 {
-${dartEnum.constructors.map(this.printConstructor).join("\n  ")}\
+  ${dartEnum.entries
+    .map(
+      (e) =>
+        `${e.name}${e.generics ?? ""}${
+          e.arguments.length === 0
+            ? ""
+            : `(${e.arguments
+                .map((a) => (a.name ? a.name + " :" : "") + a.value)
+                .join(", ")})`
+        }`
+    )
+    .join(",\n  ")};
 ${dartEnum.fields.map(this.printField).join("\n  ")}\
+${dartEnum.constructors.map(this.printConstructor).join("\n  ")}\
 ${dartEnum.methods.map(this.printFunction).join("\n  ")}\
 }`;
   };
