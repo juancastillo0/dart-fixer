@@ -129,20 +129,15 @@ const dartClassFromJson = (
       );
     }
   } else if ("enum" in schema) {
-    const enu: DartEnum = {
+    const enu = new DartEnum({
       name: customName,
       entries: schema.enum.map((e) => ({
         arguments: [],
         generics: null,
-        name: e,
+        name: toDartIdentifier(e),
       })),
-      constructors: [],
-      fields: [],
-      generics: null,
-      interfaces: [],
-      methods: [],
-      mixins: [],
-    };
+    });
+    // TODO: from json and to json
 
     ctx.enums.set(enu.name, enu);
     return enu;
@@ -161,29 +156,6 @@ const dartClassFromJson = (
       }>`,
     };
   } else if ("discriminator" in schema) {
-    const unionBaseClass = new DartClass({
-      name: customName,
-      bracket: null,
-      constructors: [],
-      extendsBound: null,
-      fields: [],
-      generics: null,
-      interfaces: [],
-      isAbstract: false,
-      methods: [],
-      mixins: [],
-    });
-    unionBaseClass.constructors.push(
-      new DartConstructor({
-        dartClass: unionBaseClass,
-        isConst: true,
-        isFactory: false,
-        name: null,
-        params: [],
-        body: null,
-      })
-    );
-
     const variants = Object.entries(schema.mapping).map(([name, type]) => {
       const variant = dartClassFromJson(addPathToCtx(name, ctx), type);
       if (variant instanceof DartClass) {
@@ -192,52 +164,15 @@ const dartClassFromJson = (
       } else {
         throw new Error(
           `Invalid JSON type definition schema (non-object union mapping):\
- ${JSON.stringify(type)}`
+  ${JSON.stringify(type)}`
         );
       }
     });
-    // TODO: generate variant factories;
-
-    const func = unionMapMethod({ maybe: false, unionBaseClass, variants });
-    unionBaseClass.methods.push(func);
-    const funcMaybe = unionMapMethod({ maybe: true, unionBaseClass, variants });
-    unionBaseClass.methods.push(funcMaybe);
-
-    const fromJsonFactory = new DartConstructor({
-      dartClass: unionBaseClass,
-      isConst: false,
-      isFactory: true,
-      name: "fromJson",
-      params: [],
-      body: `{
-  switch (json["${schema.discriminator}"] as String) {
-    ${variants
-      .map(
-        ({ name, variant }) => `\
-    case "${name}":
-      return ${variant.name}.fromJson(json);`
-      )
-      .join("\n  ")}
-  }
-  throw StateError("Unknown variant for union ${unionBaseClass.name} \${json}");
-}`,
+    const unionBaseClass = createUnionClass(customName, {
+      discriminator: schema.discriminator,
+      mapping: variants,
+      kind: UnionKind.discriminator,
     });
-    fromJsonFactory.params.push(
-      new DartConstructorParam(
-        {
-          defaultValue: null,
-          isNamed: false,
-          isRequired: true,
-          isSuper: false,
-          isThis: false,
-          name: "json",
-          type: "Map",
-        },
-        fromJsonFactory
-      )
-    );
-    unionBaseClass.constructors.push(fromJsonFactory);
-
     ctx.classes.set(unionBaseClass.name, unionBaseClass);
     return unionBaseClass;
   } else {
@@ -329,3 +264,112 @@ ${
   }
   return func;
 };
+
+export enum UnionKind {
+  discriminator,
+  nested,
+  noDiscriminator,
+}
+
+export function createUnionClass(
+  customName: string,
+  schema:
+    | {
+        kind: UnionKind.noDiscriminator | UnionKind.nested;
+        discriminator?: undefined;
+        mapping: Array<{ name: string; variant: DartClass }>;
+      }
+    | {
+        kind: UnionKind.discriminator;
+        discriminator: string;
+        mapping: Array<{ name: string; variant: DartClass }>;
+      }
+): DartClass {
+  const unionBaseClass = new DartClass({
+    name: customName,
+    bracket: null,
+    constructors: [],
+    extendsBound: null,
+    fields: [],
+    generics: null,
+    interfaces: [],
+    isAbstract: false,
+    methods: [],
+    mixins: [],
+  });
+  unionBaseClass.constructors.push(
+    new DartConstructor({
+      dartClass: unionBaseClass,
+      isConst: true,
+      isFactory: false,
+      name: null,
+      params: [],
+      body: null,
+    })
+  );
+
+  const variants = schema.mapping;
+  // TODO: generate variant factories;
+
+  const func = unionMapMethod({ maybe: false, unionBaseClass, variants });
+  unionBaseClass.methods.push(func);
+  const funcMaybe = unionMapMethod({ maybe: true, unionBaseClass, variants });
+  unionBaseClass.methods.push(funcMaybe);
+  const stateError = `throw StateError("Unknown variant for union ${unionBaseClass.name} \${json}");`;
+
+  const fromJsonFactory = new DartConstructor({
+    dartClass: unionBaseClass,
+    isConst: false,
+    isFactory: true,
+    name: "fromJson",
+    params: [],
+    body:
+      schema.kind === UnionKind.noDiscriminator
+        ? `{
+for (final func in const [${variants
+            .map((v) => `${v.name}.fromJson,`)
+            .join("")}]) {
+  try {
+    return func(json);
+  } catch(_) {}
+}
+${stateError}
+}`
+        : `{
+switch (${
+            schema.kind === UnionKind.discriminator
+              ? `json["${schema.discriminator}"] as String`
+              : "json.entries.where((e) => e.value is Map).first.key"
+          }) {
+  ${variants
+    .map(
+      ({ name, variant }) => `\
+  case "${name}":
+    return ${variant.name}.fromJson(${
+        schema.kind === UnionKind.discriminator
+          ? `json`
+          : `json["${name}"] as Map<String, Object${question}>`
+      });`
+    )
+    .join("\n  ")}
+}
+${stateError}
+}`,
+  });
+  fromJsonFactory.params.push(
+    new DartConstructorParam(
+      {
+        defaultValue: null,
+        isNamed: false,
+        isRequired: true,
+        isSuper: false,
+        isThis: false,
+        name: "json",
+        type: "Map",
+      },
+      fromJsonFactory
+    )
+  );
+  unionBaseClass.constructors.push(fromJsonFactory);
+  return unionBaseClass;
+}

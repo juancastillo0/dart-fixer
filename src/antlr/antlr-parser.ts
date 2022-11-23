@@ -201,7 +201,7 @@ export const parseClassesAntlr = (
           break;
         }
         case TypeDefinitionKind.enum: {
-          const enumValue: DartEnum = {
+          const enumValue = new DartEnum({
             generics: getIntervalText(typeDef.typeParameters),
             name: typeDef.typeIdentifier!.text,
             fields: [],
@@ -223,7 +223,7 @@ export const parseClassesAntlr = (
             })),
             interfaces: typeDef.interfaces?.map(getIntervalText) ?? [],
             mixins: typeDef.mixins?.map(getIntervalText) ?? [],
-          };
+          });
           setClassMemberLists(ctx, typeDef.classMemberDefinitions, enumValue);
           enums.push(enumValue);
           break;

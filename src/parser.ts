@@ -187,7 +187,7 @@ export interface DartExtension {
   methods: Array<DartFunction>;
 }
 
-export interface DartEnum {
+export class DartEnum {
   name: string;
   generics: string | null;
   constructors: Array<DartConstructor>;
@@ -196,7 +196,31 @@ export interface DartEnum {
   entries: Array<DartEnumEntry>;
   fields: Array<DartField>;
   methods: Array<DartFunction>;
+
+  constructor(
+    params: Partial<DartEnum> & { name: string; entries: Array<DartEnumEntry> }
+  ) {
+    this.name = params.name;
+    this.generics = params.generics ?? null;
+    this.constructors = params.constructors ?? [];
+    this.interfaces = params.interfaces ?? [];
+    this.mixins = params.mixins ?? [];
+    this.entries = params.entries;
+    this.fields = params.fields ?? [];
+    this.methods = params.methods ?? [];
+  }
+
+  get isSimpleEnum(): boolean {
+    return !this.constructors.some(
+      (c) => !c.isFactory && c.params.length !== 0
+    );
+  }
 }
+
+export const toDartIdentifier = (entry: string): string => {
+  const value = entry.replace(/[-]/g, "_").replace(/[^a-zA-Z0-9]/g, "");
+  return value.match(/^\d/) ? `$${value}` : value;
+};
 
 export interface DartEnumEntry {
   name: string;
