@@ -9,6 +9,11 @@ export type PubSpecDependency = Record<
   string | { path: string } | { git: Record<string, string> } | { sdk: string }
 >;
 
+export interface PubSpecParsed {
+  data: PubSpecData;
+  uri: vscode.Uri;
+}
+
 export interface PubSpecData {
   name: string;
   description?: string;
@@ -63,17 +68,19 @@ export const getRootDir = (params: {
   return dir;
 };
 
+export interface ResolveUriParams {
+  fileUri: vscode.Uri;
+  packageName: string | undefined;
+  rootDir: vscode.Uri | undefined;
+  importItem: DartImport;
+}
+
 export const resolveUri = ({
   fileUri,
   packageName,
   rootDir,
   importItem,
-}: {
-  fileUri: vscode.Uri;
-  packageName: string | undefined;
-  rootDir: vscode.Uri | undefined;
-  importItem: DartImport;
-}): vscode.Uri | undefined => {
+}: ResolveUriParams): vscode.Uri | undefined => {
   let uri: vscode.Uri | undefined;
   if (importItem.path.startsWith(".")) {
     uri = vscode.Uri.joinPath(fileUri, "..", importItem.path);
