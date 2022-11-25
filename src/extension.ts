@@ -55,17 +55,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMAND_GENERATE_JSON_TYPE_DEFINITION, () =>
-      executeJsonToDartCommand(JsonFileKind.typeDefinition)
+      executeJsonToDartCommand(JsonFileKind.typeDefinition, { analyzer })
     )
   );
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMAND_GENERATE_JSON_SCHEMA, () =>
-      executeJsonToDartCommand(JsonFileKind.schema)
+      executeJsonToDartCommand(JsonFileKind.schema, { analyzer })
     )
   );
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMAND_GENERATE_JSON_DOCUMENT, () =>
-      executeJsonToDartCommand(JsonFileKind.document)
+      executeJsonToDartCommand(JsonFileKind.document, { analyzer })
     )
   );
 
@@ -167,7 +167,10 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
         "Generate Class Helpers",
         vscode.CodeActionKind.QuickFix
       );
-      const { content, md5Hash } = generate(dartClass, data.config ?? {});
+      const { content, md5Hash } = generate(dartClass, data.config ?? {}, {
+        analyzer: this.analyzer,
+        outputFile: document.uri.toString(),
+      });
       let rangeToEdit = new vscode.Range(
         originalEnd.line,
         originalEnd.column,

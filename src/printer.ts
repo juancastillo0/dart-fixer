@@ -1,13 +1,18 @@
 import { createHash } from "crypto";
+import { DartAnalyzer } from "./analyzer";
 import { DartModelPrinter } from "./dart-model-printer";
 import {
   DartClass,
   DartConstructor,
   DartConstructorParam,
   DartConstructorSpec,
+  DartDefKind,
   DartField,
   DartFieldOrParam,
+  DartFunction,
+  DartFunctionParam,
   DartType,
+  DartTypeAlias,
 } from "./parser";
 
 export interface GenerationOptions {
@@ -56,9 +61,15 @@ const defaultGenerationOptions: GenerationOptions = {
   builder: {},
 };
 
+interface GenerateAnalyzerParams {
+  analyzer: DartAnalyzer;
+  outputFile: string;
+}
+
 export const generate = (
   dartClass: DartClass,
-  options: GenerationOptions
+  options: GenerationOptions,
+  params?: GenerateAnalyzerParams
 ): { content: string; md5Hash: string } => {
   options = { ...options };
   for (const [k, v] of Object.entries(defaultGenerationOptions)) {
@@ -70,7 +81,7 @@ export const generate = (
     dartClass.defaultConstructor ?? makeConstructorFromFields(dartClass);
 
   const output = `\
-  ${options.fromJson ? generateFromJson(defaultConstructor) : ""}\
+  ${options.fromJson ? generateFromJson(defaultConstructor, params) : ""}\
   ${options.toJson ? generateToJson(dartClass.fieldsNotStatic) : ""}\
   ${options.equality ? generateEquality(dartClass, defaultConstructor) : ""}\
   ${
@@ -136,7 +147,8 @@ const makeConstructorFromFields = (
 };
 
 export const generateFromJson = (
-  dartConstructor: DartConstructorSpec
+  dartConstructor: DartConstructorSpec,
+  params?: GenerateAnalyzerParams
 ): string => {
   return `
 factory ${dartConstructor.dartClass.name}.fromJson(Map json) {
@@ -144,15 +156,17 @@ factory ${dartConstructor.dartClass.name}.fromJson(Map json) {
     dartConstructor,
     dartConstructor.params.map((p) => ({
       name: p.name,
-      value: fromJsonValue({ param: p }),
+      value: fromJsonValue({ param: p, params }),
     }))
   )};
 }
 `;
 };
 
+// TODO: use information from other type.
+// Enums don't use Map as argument to fromJson and primitive type definitions do not have a fromJson
 const fromJsonValue = (
-  options:
+  options: (
     | {
         param?: null;
         dartType: DartType | undefined;
@@ -163,6 +177,7 @@ const fromJsonValue = (
         getter?: null;
         dartType?: null;
       }
+  ) & { params: GenerateAnalyzerParams | undefined }
 ): string => {
   const param = options.param;
   const getter = options.getter ?? `json["${param!.name}"]`;
@@ -177,15 +192,18 @@ const fromJsonValue = (
       {
         dartType: dartType.generics[0],
         getter: "k",
+        params: options.params,
       }
     )},${fromJsonValue({
       dartType: dartType.generics[1],
       getter: "v",
+      params: options.params,
     })}))`;
   } else if (dartType.isList || dartType.isSet) {
     return `${nullableCast}(${getter} as Iterable).map((v) => ${fromJsonValue({
       dartType: dartType.generics[0],
       getter: "v",
+      params: options.params,
     })}).to${dartType.name}()`;
   } else if (dartType.isDateTime) {
     return `${nullableCast}DateTime.parse(${getter} as String)`;
@@ -196,7 +214,42 @@ const fromJsonValue = (
   } else if (dartType.isPrimitive || dartType.text === "Object") {
     return `${getter} as ${dartType.text}`;
   }
-  return `${dartType.name}.fromJson((${getter} as Map).cast())`;
+
+  let argType: string | null = null;
+  if (options.params?.analyzer) {
+    const typeDef = options.params.analyzer.resolveType({
+      file: options.params.outputFile,
+      dartType,
+    });
+    if (typeDef && !(typeDef instanceof DartTypeAlias)) {
+      const functionName = "fromJson";
+      const fromJsonStatic = typeDef.methods.find(
+        (m) => m.name === functionName && m.isStatic && m.params.length === 1
+      );
+      if (fromJsonStatic) {
+        argType = fromJsonStatic.params[0].type;
+      } else if (typeDef.kind !== DartDefKind.mixin) {
+        const fromJsonFactory = typeDef.constructors.find(
+          (m) => m.name === functionName && m.params.length === 1
+        );
+        if (fromJsonFactory) {
+          argType = fromJsonFactory.params[0].type;
+        }
+      }
+      if (!argType && typeDef.kind === DartDefKind.enum) {
+        return `${nullableCast}${dartType.text}.values.byName(${getter} as String)`;
+      }
+    }
+  }
+  // TODO: when should we use ${nullableCast}? could it be configurable?
+  if (argType && new DartType(argType).name === "Map") {
+    return `${nullableCast}${dartType.name}.fromJson((${getter} as Map).cast())`;
+  }
+  // TODO: enum
+  // TODO:  return `${dartType.name}.fromJson((${getter} as Map).cast())`;
+  return `${nullableCast}${dartType.name}.fromJson(${getter} as ${
+    argType ?? "dynamic"
+  })`;
 };
 
 export const generateToJson = (fieldsNotStatic: Array<DartField>): string => {
