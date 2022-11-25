@@ -57,7 +57,7 @@ export enum JsonFileKind {
 
 export const executeJsonToDartCommand = async (
   jsonKind: JsonFileKind,
-  options?: { fromClipboard?: true }
+  options?: { fromClipboard?: true; analyzer: DartAnalyzer }
 ): Promise<boolean> => {
   const activeEditor = vscode.window.activeTextEditor;
   if (!activeEditor) {
@@ -80,7 +80,8 @@ export const executeJsonToDartCommand = async (
   try {
     const edit = await createDartModelFromJTD(
       params ?? activeEditor.document,
-      jsonKind
+      jsonKind,
+      options?.analyzer
     );
     const success = await vscode.workspace.applyEdit(edit);
     if (success) {
@@ -101,7 +102,8 @@ interface JsonEditParams {
 
 export const createDartModelFromJTD = async (
   document: vscode.TextDocument | JsonEditParams,
-  kind: JsonFileKind
+  kind: JsonFileKind,
+  analyzer: DartAnalyzer | undefined
 ): Promise<vscode.WorkspaceEdit> => {
   const isText = "newFile" in document;
   const text = isText ? document.text : document.getText();
@@ -146,7 +148,16 @@ ${classes
     // for base union classes with no fields
     classes[i].fields.length === 0
       ? c
-      : `${c.substring(0, c.length - 1)}${generate(classes[i], {}).content}`
+      : `${c.substring(0, c.length - 1)}${
+          generate(
+            classes[i],
+            {},
+            analyzer && {
+              analyzer,
+              outputFile: newFile.toString(),
+            }
+          ).content
+        }`
   )
   .join("\n\n")}\
 ${[...ctx.enums.values()].map(printer.printEnum).join("\n\n")}\
