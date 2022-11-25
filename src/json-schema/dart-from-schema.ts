@@ -58,12 +58,21 @@ const resolveRef = (
   return undefined;
 };
 
+type DiscriminantFields = Array<{
+  field: DartField;
+  discriminant: string;
+}>;
+
 const mapJsonSchemaListType = (
   ctx: JsonSchemaCtx,
   schemas: Readonly<Array<PartialSchema<Known>>>
 ):
   | { classes: Array<DartClass>; onlyOneProperty: Array<string> | undefined }
   | { name: string }
+  | {
+      discriminant: string;
+      mapping: Map<string, DartClass>;
+    }
   | undefined => {
   try {
     let result: ReturnType<typeof mapJsonSchemaListType>;
@@ -86,38 +95,23 @@ const mapJsonSchemaListType = (
       }
     } else if (allClasses) {
       const classes = values as Array<DartClass>;
-      // const classesDiscriminant = new Map<string, DartClass>();
-      // let stringProps: Set<string> | undefined;
-      // classes.every((c, i) => {
-      //   const fields = c.fields
-      //     .filter((f) => {
-      //       const schema = schemas[i];
-      //       return (
-      //         f.type === "String" &&
-      //         "type" in schema &&
-      //         schema.type === "object" &&
-      //         (schema.properties?.[f.name] as Nullable<unknown> | undefined)
-      //           ?.const
-      //       );
-      //     })
-      //     .map((f) => f.name);
-      //   if (!stringProps) {
-      //     stringProps = new Set(fields);
-      //   }
 
-      //   return stringProps.size > 0;
-      // });
-      const onlyOneProperty = classes
-        .map((c) => (c.fields.length === 1 ? c.fields[0].name : undefined))
-        .filter((n) => typeof n === "string") as Array<string>;
+      const discriminant = extractDiscriminantMapping(classes, schemas);
+      if (discriminant) {
+        result = discriminant;
+      } else {
+        const onlyOneProperty = classes
+          .map((c) => (c.fields.length === 1 ? c.fields[0].name : undefined))
+          .filter((n) => typeof n === "string") as Array<string>;
 
-      result = {
-        classes,
-        onlyOneProperty:
-          new Set(onlyOneProperty).size === classes.length
-            ? onlyOneProperty
-            : undefined,
-      };
+        result = {
+          classes,
+          onlyOneProperty:
+            new Set(onlyOneProperty).size === classes.length
+              ? onlyOneProperty
+              : undefined,
+        };
+      }
     } else {
       // TODO:
       // throw new Error(`Unsupported union ${JSON.stringify(schemas)}`);
@@ -149,7 +143,10 @@ const mapJsonSchemaType = (
 
   Object.entries(schema.$defs ?? schema.definitions ?? {}).forEach(
     ([name, type]) => {
-      const value = mapJsonSchemaType(addPathToCtx(name, ctx), type);
+      const newCtx = addPathToCtx(name, ctx);
+      // Remove file name for types in definitions
+      newCtx.path.splice(0, 1);
+      const value = mapJsonSchemaType(newCtx, type);
       if (!(value instanceof DartClass || value instanceof DartEnum)) {
         ctx.primitiveRefs.set(name, value.name);
       }
@@ -172,7 +169,7 @@ const mapJsonSchemaType = (
         : undefined;
 
     if (isOneOf || isAnyOf) {
-      if (isAnyOf) {
+      if (isAnyOf && isOneOf) {
         throw new Error(`Can't have anyOf and oneOf ${JSON.stringify(schema)}`);
       }
       const values = (isOneOf ?? isAnyOf)!;
@@ -184,6 +181,15 @@ const mapJsonSchemaType = (
           mapping: values.classes.map((c, i) => ({
             variant: c,
             name: values.onlyOneProperty?.[i] ?? c.name,
+          })),
+        });
+      } else if ("discriminant" in values) {
+        result = createUnionClass(customName, {
+          kind: UnionKind.discriminator,
+          discriminator: values.discriminant,
+          mapping: [...values.mapping.entries()].map(([name, variant]) => ({
+            variant,
+            name,
           })),
         });
       } else {
@@ -208,97 +214,21 @@ const mapJsonSchemaType = (
           });
         dartClass.fields.push(...props.values());
         result = dartClass;
+      } else if ("discriminant" in isAllOf) {
+        throw new Error(
+          `Can't have property "${
+            isAllOf.discriminant
+          }" take multiple values in allOf. ${JSON.stringify(schema)}`
+        );
       } else {
         result = isAllOf;
       }
     } else if ("enum" in schema && schema.enum) {
-      const dartEnum = new DartEnum({
-        entries: [],
-        name: customName,
-      });
-
-      // TODO: support null
-
-      const enumTypes = new Set(schema.enum.map((e) => typeof e));
-      const isString = enumTypes.size === 1 && enumTypes.has("string");
-      const isNumber = enumTypes.size === 1 && enumTypes.has("number");
-
-      const constructor = new DartConstructor({
-        dartClass: dartEnum,
-        isConst: true,
-        isFactory: false,
-        name: null,
-      });
-      constructor.params.push(
-        new DartConstructorParam(
-          {
-            isNamed: false,
-            isRequired: true,
-            isThis: true,
-            name: "value",
-            type: null,
-          },
-          constructor
-        )
-      );
-      dartEnum.constructors.push(constructor);
-      const valueType = isString ? "String" : isNumber ? "double" : "Object";
-      dartEnum.fields.push(
-        new DartField(
-          { name: "value", type: valueType, isFinal: true, isVariable: false },
-          dartEnum
-        )
-      );
-      dartEnum.entries.push(
-        ...schema.enum.map<DartEnumEntry>((e) => ({
-          name: toDartIdentifier(`${e as string}`),
-          arguments: [
-            {
-              name: null,
-              value: `${
-                typeof e === "string" ? `"${e}"` : e?.toString() ?? "null"
-              }`,
-            },
-          ],
-          generics: null,
-        }))
-      );
-
-      const fromJsonConstructor = new DartConstructor({
-        dartClass: dartEnum,
-        isConst: false,
-        isFactory: true,
-        name: "fromJson",
-        params: [],
-        body: `=> values.firstWhere((v) => v.value == json);`,
-      });
-      fromJsonConstructor.params.push(
-        new DartConstructorParam(
-          {
-            isNamed: false,
-            isRequired: true,
-            name: "json",
-            type: `Object${question}`,
-          },
-          fromJsonConstructor
-        )
-      );
-      dartEnum.constructors.push(fromJsonConstructor);
-      dartEnum.methods.push(
-        new DartFunction(
-          {
-            returnType: valueType,
-            name: "toJson",
-            params: [],
-            body: `=> value;`,
-          },
-          dartEnum
-        )
-      );
+      const dartEnum = mapDartEnumFromJsonSchema(customName, schema.enum);
       ctx.enums.set(dartEnum.name, dartEnum);
       result = dartEnum;
-    } else if ("$ref" in schema) {
-      result = { name: extractNameFromRef(schema.$ref!) };
+    } else if ("$ref" in schema && schema.$ref) {
+      result = { name: extractNameFromRef(schema.$ref) };
     }
   } else if (Array.isArray(schema.type)) {
     if (schema.type.length === 2 && schema.type.includes("null")) {
@@ -351,40 +281,41 @@ const mapJsonSchemaType = (
         inner = typeValue.name;
       }
       result = { name: `Map<String, ${inner}>` };
-    }
-    const dartClass = new DartClass({
-      name: customName,
-      bracket: null,
-    });
-    // TODO:
-    // allOf
-    // schema.patternProperties;
-    // schema.propertyNames;
-    // schema.unevaluatedProperties;
-    // schema.additionalProperties;
+    } else {
+      const dartClass = new DartClass({
+        name: customName,
+        bracket: null,
+      });
+      // TODO:
+      // allOf
+      // schema.patternProperties;
+      // schema.propertyNames;
+      // schema.unevaluatedProperties;
+      // schema.additionalProperties;
 
-    dartClass.fields.push(
-      ...Object.entries(schema.properties ?? {}).map(([name, type]) => {
-        const typeValue = mapJsonSchemaType(
-          addPathToCtx(name, ctx),
-          // TODO:
-          (type ?? { type: "null" }) as SomeJSONSchema
-        );
-        return new DartField(
-          {
-            isFinal: true,
-            isVariable: false,
-            name,
-            type:
-              typeValue.name +
-              ((schema.required ?? []).includes(name) ? "" : question),
-          },
-          dartClass
-        );
-      })
-    );
-    ctx.classes.set(dartClass.name, dartClass);
-    result = dartClass;
+      dartClass.fields.push(
+        ...Object.entries(schema.properties ?? {}).map(([name, type]) => {
+          const typeValue = mapJsonSchemaType(
+            addPathToCtx(name, ctx),
+            // TODO:
+            (type ?? { type: "null" }) as SomeJSONSchema
+          );
+          return new DartField(
+            {
+              isFinal: true,
+              isVariable: false,
+              name,
+              type:
+                typeValue.name +
+                ((schema.required ?? []).includes(name) ? "" : question),
+            },
+            dartClass
+          );
+        })
+      );
+      ctx.classes.set(dartClass.name, dartClass);
+      result = dartClass;
+    }
   }
   if (result) {
     if (schema.$id) {
@@ -401,7 +332,8 @@ const mapJsonSchemaType = (
 
 const extractNameFromRef = (ref: string): string => {
   const slashIndex = ref.lastIndexOf("/");
-  return ref.substring(slashIndex + 1).replace(/#\./g, "");
+  const name = ref.substring(slashIndex + 1).replace(/#\./g, "");
+  return recase(name, "PascalCase");
 };
 
 function mergeTypes(type: string | null, prevType: string): string | null {
@@ -421,4 +353,155 @@ function mergeTypes(type: string | null, prevType: string): string | null {
     }
   }
   return type;
+}
+
+type EnumValue = string | number | bigint | boolean | object | null | undefined;
+
+const mapDartEnumFromJsonSchema = (
+  customName: string,
+  enumValues: Readonly<Array<EnumValue>>
+): DartEnum => {
+  const dartEnum = new DartEnum({
+    entries: [],
+    name: customName,
+  });
+
+  // TODO: support null
+
+  const enumTypes = new Set(enumValues.map((e) => typeof e));
+  const isString = enumTypes.size === 1 && enumTypes.has("string");
+  const isNumber = enumTypes.size === 1 && enumTypes.has("number");
+
+  const constructor = new DartConstructor({
+    dartClass: dartEnum,
+    isConst: true,
+    isFactory: false,
+    name: null,
+  });
+  constructor.params.push(
+    new DartConstructorParam(
+      {
+        isNamed: false,
+        isRequired: true,
+        isThis: true,
+        name: "value",
+        type: null,
+      },
+      constructor
+    )
+  );
+  dartEnum.constructors.push(constructor);
+  const valueType = isString ? "String" : isNumber ? "double" : "Object";
+  dartEnum.fields.push(
+    new DartField(
+      { name: "value", type: valueType, isFinal: true, isVariable: false },
+      dartEnum
+    )
+  );
+  dartEnum.entries.push(
+    ...enumValues.map<DartEnumEntry>((e) => ({
+      name: toDartIdentifier(`${e as string}`),
+      arguments: [
+        {
+          name: null,
+          value: `${
+            typeof e === "string" ? `"${e}"` : e?.toString() ?? "null"
+          }`,
+        },
+      ],
+      generics: null,
+    }))
+  );
+
+  const fromJsonConstructor = new DartConstructor({
+    dartClass: dartEnum,
+    isConst: false,
+    isFactory: true,
+    name: "fromJson",
+    params: [],
+    body: `=> values.firstWhere((v) => v.value == json);`,
+  });
+  fromJsonConstructor.params.push(
+    new DartConstructorParam(
+      {
+        isNamed: false,
+        isRequired: true,
+        name: "json",
+        type: `Object${question}`,
+      },
+      fromJsonConstructor
+    )
+  );
+  dartEnum.constructors.push(fromJsonConstructor);
+  dartEnum.methods.push(
+    new DartFunction(
+      {
+        returnType: valueType,
+        name: "toJson",
+        params: [],
+        body: `=> value;`,
+      },
+      dartEnum
+    )
+  );
+  return dartEnum;
+};
+
+function extractDiscriminantMapping(
+  classes: Array<DartClass>,
+  schemas: Readonly<Array<PartialSchema<Known>>>
+): {
+  discriminant: string;
+  mapping: Map<string, DartClass>;
+} | null {
+  const classesDiscriminant = new Map<DartClass, DiscriminantFields>();
+  let stringProps: Set<string> | undefined;
+  classes.every((c, i) => {
+    const fields = c.fields
+      .map((f) => {
+        const schema = schemas[i];
+        const isStringConst =
+          f.type === "String" && "type" in schema && schema.type === "object";
+        if (isStringConst) {
+          const value = (
+            schema.properties?.[f.name] as Nullable<unknown> | undefined
+          )?.const;
+          if (typeof value === "string") {
+            return {
+              field: f,
+              discriminant: value,
+            };
+          }
+        }
+        return undefined;
+      })
+      .filter((f) => f !== undefined) as DiscriminantFields;
+    classesDiscriminant.set(c, fields);
+    const currentStringProps = new Set(fields.map((f) => f.field.name));
+    if (!stringProps) {
+      stringProps = currentStringProps;
+    } else {
+      currentStringProps.forEach((v) => stringProps!.delete(v));
+    }
+
+    return stringProps.size > 0;
+  });
+
+  let discriminant: ReturnType<typeof extractDiscriminantMapping> = null;
+  if (stringProps) {
+    for (const fieldName of stringProps) {
+      const mapping = new Map<string, DartClass>();
+      const allDifferent = [...classesDiscriminant.entries()].every(
+        ([c, v]) => {
+          const f = v.find((f) => f.field.name === fieldName)!;
+          return !mapping.has(f.discriminant) && mapping.set(f.discriminant, c);
+        }
+      );
+      if (allDifferent) {
+        discriminant = { discriminant: fieldName, mapping };
+        break;
+      }
+    }
+  }
+  return discriminant;
 }
