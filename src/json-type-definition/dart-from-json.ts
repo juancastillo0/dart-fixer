@@ -8,7 +8,7 @@ import {
   DartFunctionParam,
   toDartIdentifier,
 } from "../parser";
-import { question } from "../printer";
+import { makeConstructorFromFields, question } from "../printer";
 import { recase } from "../utils";
 import { SomeJTDSchemaType } from "./schema-type";
 
@@ -281,14 +281,6 @@ export function createUnionClass(
   const unionBaseClass = new DartClass({
     name: customName,
     bracket: null,
-    constructors: [],
-    extendsBound: null,
-    fields: [],
-    generics: null,
-    interfaces: [],
-    isAbstract: false,
-    methods: [],
-    mixins: [],
   });
   unionBaseClass.constructors.push(
     new DartConstructor({
@@ -302,7 +294,36 @@ export function createUnionClass(
   );
 
   const variants = schema.mapping;
-  // TODO: generate variant factories;
+
+  unionBaseClass.constructors.push(
+    ...variants.map(({ variant, name }) => {
+      const defaultConstructor =
+        variant.defaultConstructor ?? makeConstructorFromFields(variant);
+      const variantFactory = new DartConstructor({
+        dartClass: unionBaseClass,
+        isConst: defaultConstructor.isConst,
+        isFactory: true,
+        name: recase(toDartIdentifier(name), "camelCase"),
+        params: [],
+        body: ` = ${variant.name};`,
+      });
+      variantFactory.params.push(
+        ...defaultConstructor.params.map(
+          (p) =>
+            new DartConstructorParam(
+              {
+                isNamed: p.isNamed,
+                isRequired: p.isRequired,
+                name: p.name,
+                type: p.type,
+              },
+              variantFactory
+            )
+        )
+      );
+      return variantFactory;
+    })
+  );
 
   const func = unionMapMethod({ maybe: false, unionBaseClass, variants });
   unionBaseClass.methods.push(func);

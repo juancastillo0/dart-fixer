@@ -112,7 +112,7 @@ ${output}
   return { content, md5Hash };
 };
 
-const makeConstructorFromFields = (
+export const makeConstructorFromFields = (
   dartClass: DartClass,
   opts?: { body?: string; name?: string }
 ): DartConstructor => {
