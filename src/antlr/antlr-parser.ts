@@ -61,7 +61,7 @@ import {
   DartMixin,
   DartParserConfig,
   DartTypeScope,
-  TypeAlias,
+  DartTypeAlias,
 } from "../parser";
 import { Interval } from "antlr4ts/misc/Interval";
 import { cleanRawText } from "../parser-utils";
@@ -126,7 +126,7 @@ export const parseClassesAntlr = (
   const extensions: Array<DartExtension> = [];
   const enums: Array<DartEnum> = [];
   const fields: Array<DartField> = [];
-  const typeAliases: Array<TypeAlias> = [];
+  const typeAliases: Array<DartTypeAlias> = [];
 
   for (const def of tree.topLevelDefinition()) {
     const classDec = def.classDeclaration();
@@ -150,52 +150,54 @@ export const parseClassesAntlr = (
         typeAlias.typeIdentifier() ??
         typeAlias.functionTypeAlias()!.functionPrefix().identifier();
 
-      typeAliases.push({
-        name: name.text,
-        generics: getIntervalText(
-          typeAlias.typeParameters() ??
-            typeAlias
-              .functionTypeAlias()
-              ?.formalParameterPart()
-              ?.typeParameters()
-        ),
-        type:
-          getIntervalText(typeAlias.type()) ??
-          getIntervalText(typeAlias.functionTypeAlias()!).substring(
-            0,
-            name.stop!.startIndex
-          ) +
-            " Function " +
+      typeAliases.push(
+        new DartTypeAlias({
+          name: name.text,
+          generics: getIntervalText(
+            typeAlias.typeParameters() ??
+              typeAlias
+                .functionTypeAlias()
+                ?.formalParameterPart()
+                ?.typeParameters()
+          ),
+          type:
+            getIntervalText(typeAlias.type()) ??
             getIntervalText(typeAlias.functionTypeAlias()!).substring(
-              name.stop!.stopIndex
-            ),
-      });
+              0,
+              name.stop!.startIndex
+            ) +
+              " Function " +
+              getIntervalText(typeAlias.functionTypeAlias()!).substring(
+                name.stop!.stopIndex
+              ),
+        })
+      );
     } else if (objDec) {
       const typeDef = parseTypeDefinition(objDec);
       switch (typeDef.kind) {
         case TypeDefinitionKind.class:
           break;
         case TypeDefinitionKind.mixin: {
-          const mixin: DartMixin = {
+          const mixin = new DartMixin({
             generics: getIntervalText(typeDef.typeParameters),
             on: typeDef.mixins?.map(getIntervalText) ?? [],
             interfaces: typeDef.interfaces?.map(getIntervalText) ?? [],
             name: typeDef.typeIdentifier!.text,
             fields: [],
             methods: [],
-          };
+          });
           setClassMemberLists(ctx, typeDef.classMemberDefinitions, mixin);
           mixins.push(mixin);
           break;
         }
         case TypeDefinitionKind.extension: {
-          const extension: DartExtension = {
+          const extension = new DartExtension({
             generics: getIntervalText(typeDef.typeParameters),
             on: getIntervalText(typeDef.onExtension!),
             name: typeDef.typeIdentifier?.text ?? null,
             fields: [],
             methods: [],
-          };
+          });
           setClassMemberLists(ctx, typeDef.classMemberDefinitions, extension);
           extensions.push(extension);
           break;

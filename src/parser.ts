@@ -9,6 +9,21 @@ export interface DartParserConfig {
   packageName?: string;
 }
 
+export type DartTypeDef = DartClass | DartEnum | DartTypeAlias | DartMixin;
+export type DartDef = DartTypeDef | DartFunction | DartField;
+
+export enum DartDefKind {
+  class = "class",
+  mixin = "mixin",
+  enum = "enum",
+  extension = "extension",
+  alias = "alias",
+  function = "function",
+  field = "field",
+}
+
+export type DartTypeScope = DartClass | DartMixin | DartEnum | DartExtension;
+
 export interface DartImportsData {
   imports: Array<DartImport>;
   classes: Array<DartClass>;
@@ -18,7 +33,7 @@ export interface DartImportsData {
   mixins: Array<DartMixin>;
   extensions: Array<DartExtension>;
   fields: Array<DartField>;
-  typeAliases: Array<TypeAlias>;
+  typeAliases: Array<DartTypeAlias>;
 }
 
 export class DartImports implements DartImportsData {
@@ -29,7 +44,7 @@ export class DartImports implements DartImportsData {
   readonly mixins: Array<DartMixin>;
   readonly extensions: Array<DartExtension>;
   readonly fields: Array<DartField>;
-  readonly typeAliases: Array<TypeAlias>;
+  readonly typeAliases: Array<DartTypeAlias>;
 
   readonly cleanText: CleanedText;
   readonly config: DartParserConfig;
@@ -62,6 +77,46 @@ export class DartImports implements DartImportsData {
     const b = this.brackets.findBracket(index)!;
     return this.cleanText.cleanText.substring(b.start, b.end);
   };
+
+  private _typeDefinitions: Map<string, DartTypeDef> | undefined;
+  typeDefinitions = (): Map<string, DartTypeDef> => {
+    if (this._typeDefinitions) {
+      return this._typeDefinitions;
+    }
+    this._typeDefinitions = new Map<string, DartTypeDef>();
+    for (const list of [
+      this.classes,
+      this.enums,
+      this.mixins,
+      this.typeAliases,
+    ]) {
+      for (const def of list) {
+        this._typeDefinitions.set(def.name, def);
+      }
+    }
+    return this._typeDefinitions;
+  };
+
+  private _definitions: Map<string, DartDef> | undefined;
+  definitions = (): Map<string, DartDef> => {
+    if (this._definitions) {
+      return this._definitions;
+    }
+    this._definitions = new Map<string, DartDef>();
+    for (const list of [
+      this.classes,
+      this.enums,
+      this.mixins,
+      this.typeAliases,
+      this.functions,
+      this.fields,
+    ]) {
+      for (const def of list) {
+        this._definitions.set(def.name, def);
+      }
+    }
+    return this._definitions;
+  };
 }
 
 export interface DartImportData {
@@ -88,6 +143,15 @@ export class DartImport implements DartImportData {
     !this.path.startsWith(`package:`) &&
     (!options?.root || this.path.startsWith(`/`));
 
+  appliesTo = (definition: string): boolean => {
+    const dartType = new DartType(definition);
+    return (
+      (!this.as || this.as === dartType.importPrefix) &&
+      (this.show.length === 0 || this.show.includes(dartType.name)) &&
+      (this.hide.length === 0 || !this.hide.includes(dartType.name))
+    );
+  };
+
   get isFromStandardLibrary(): boolean {
     return this.path.startsWith(`dart:`);
   }
@@ -107,6 +171,7 @@ export class DartImport implements DartImportData {
       this.isRelative();
   }
 }
+
 export interface DartConstructorSpec {
   name: string | null;
   dartClass: DartClass | DartEnum;
@@ -127,6 +192,9 @@ export interface DartClassData {
 }
 
 export class DartClass implements DartClassData {
+  get kind(): DartDefKind.class {
+    return DartDefKind.class;
+  }
   isAbstract: boolean;
   name: string;
   generics: string | null;
@@ -168,26 +236,51 @@ export class DartClass implements DartClassData {
   }
 }
 
-export type DartTypeScope = DartClass | DartMixin | DartEnum | DartExtension;
-
-export interface DartMixin {
+export class DartMixin {
+  get kind(): DartDefKind.mixin {
+    return DartDefKind.mixin;
+  }
   name: string;
   generics: string | null;
   on: Array<string>;
   interfaces: Array<string>;
   fields: Array<DartField>;
   methods: Array<DartFunction>;
+
+  constructor(params: Partial<DartMixin> & { name: string }) {
+    this.name = params.name;
+    this.generics = params.generics ?? null;
+    this.on = params.on ?? [];
+    this.interfaces = params.interfaces ?? [];
+    this.fields = params.fields ?? [];
+    this.methods = params.methods ?? [];
+  }
 }
 
-export interface DartExtension {
+export class DartExtension {
+  get kind(): DartDefKind.extension {
+    return DartDefKind.extension;
+  }
   name: string | null;
   generics: string | null;
   on: string;
   fields: Array<DartField>;
   methods: Array<DartFunction>;
+  constructor(
+    params: Partial<DartExtension> & { name: string | null; on: string }
+  ) {
+    this.name = params.name;
+    this.generics = params.generics ?? null;
+    this.on = params.on ?? [];
+    this.fields = params.fields ?? [];
+    this.methods = params.methods ?? [];
+  }
 }
 
 export class DartEnum {
+  get kind(): DartDefKind.enum {
+    return DartDefKind.enum;
+  }
   name: string;
   generics: string | null;
   constructors: Array<DartConstructor>;
@@ -233,10 +326,25 @@ export interface DartArgument {
   value: string;
 }
 
-export interface TypeAlias {
+export interface DartTypeAliasData {
   name: string;
   generics: string | null;
   type: string;
+}
+
+export class DartTypeAlias implements DartTypeAliasData {
+  get kind(): DartDefKind.alias {
+    return DartDefKind.alias;
+  }
+  name: string;
+  generics: string | null;
+  type: string;
+
+  constructor(data: DartTypeAliasData) {
+    this.name = data.name;
+    this.generics = data.generics;
+    this.type = data.type;
+  }
 }
 
 export interface DartConstructorData extends DartConstructorSpec {
@@ -344,6 +452,9 @@ export interface DartFieldData {
 }
 
 export class DartField implements DartFieldOrParam {
+  get kind(): DartDefKind.field {
+    return DartDefKind.field;
+  }
   isStatic: boolean;
   isFinal: boolean;
   name: string;
@@ -403,6 +514,9 @@ export interface DartFunctionData {
 }
 
 export class DartFunction implements DartFunctionData {
+  get kind(): DartDefKind.function {
+    return DartDefKind.function;
+  }
   isStatic: boolean;
   isExternal: boolean;
   isGetter: boolean;
@@ -440,6 +554,7 @@ export class DartType {
   text: string;
   generics: Array<DartType>;
   name: string;
+  importPrefix: string | null;
 
   constructor(rawText: string) {
     this.text = rawText.replace(/\s/g, "");
@@ -447,11 +562,18 @@ export class DartType {
       delimiters: { start: "<", end: ">" },
     });
     const topLevel = brackets.bracketsNested[0];
+    const firstPoint = this.text.indexOf(".");
+    if (firstPoint !== -1 && topLevel && topLevel.start > firstPoint) {
+      this.importPrefix = this.text.substring(0, firstPoint);
+    } else {
+      this.importPrefix = null;
+    }
+    const prefixLength = this.importPrefix ? this.importPrefix.length + 1 : 0;
     this.name = !topLevel
       ? this.isNullable
-        ? this.text.substring(0, this.text.length - 1)
+        ? this.text.substring(prefixLength, this.text.length - 1)
         : this.text
-      : this.text.substring(0, topLevel.start);
+      : this.text.substring(prefixLength, topLevel.start);
 
     this.generics = [];
     if (topLevel) {
