@@ -130,6 +130,7 @@ ${dartFunction.body ?? ";"}`;
       (a, b) => this.getParamOrder(a) - this.getParamOrder(b)
     );
     let state: "optional" | "named" | undefined;
+    const lastComma = params.length > 1;
 
     return sorted
       .map((p, index) => {
@@ -143,7 +144,7 @@ ${dartFunction.body ?? ";"}`;
         const open =
           state && state !== prev ? (state === "named" ? "{" : "[") : "";
         const close = isLast && state ? (state === "named" ? "}" : "]") : "";
-        return `${open}${b},${close}`;
+        return `${open}${b}${!isLast || lastComma ? "," : ""}${close}`;
       })
       .join("");
   };
@@ -151,7 +152,11 @@ ${dartFunction.body ?? ";"}`;
   printConstructorParam = (dartParam: DartConstructorParam): string => {
     return `\
 ${dartParam.isNamed && dartParam.isRequired ? `${req} ` : ""}\
-${dartParam.type ? dartParam.type + " " : ""}\
+${
+  dartParam.type && !(dartParam.isSuper || dartParam.isThis)
+    ? dartParam.type + " "
+    : ""
+}\
 ${!dartParam.dartConstructor.isFactory && dartParam.isSuper ? "super." : ""}\
 ${!dartParam.dartConstructor.isFactory && dartParam.isThis ? "this." : ""}\
 ${dartParam.name}\
