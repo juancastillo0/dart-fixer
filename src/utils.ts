@@ -50,3 +50,18 @@ export const recase = (
       return sections.map((s) => s.toUpperCase()).join("_");
   }
 };
+
+export const zip = <T1, T2>(
+  array1: Array<T1>,
+  array2: Array<T2>
+): Array<[T1, T2]> => {
+  return array1.map((e, i) => [e, array2[i]]);
+};
+
+export const zipMapped = <T1, T2, O>(
+  array1: Array<T1>,
+  array2: Array<T2>,
+  mapper: (elem1: T1, elem2: T2) => O
+): Array<O> => {
+  return array1.map((e, i) => mapper(e, array2[i]));
+};

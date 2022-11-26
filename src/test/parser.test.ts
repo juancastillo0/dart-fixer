@@ -1,6 +1,6 @@
 import * as assert from "assert";
 import { parseClassesAntlr } from "../antlr/antlr-parser";
-import { DartType } from "../parser";
+import { DartEnum, DartMixin, DartType } from "../parser";
 import { Bracket, getBrackets } from "../parser-utils";
 
 suite("Parser Test Suite", () => {
@@ -30,7 +30,9 @@ suite("Parser Test Suite", () => {
   });
 
   const importsAndCommentsText = `\
+@meta.Annotation
 import 'dart:convert' as convert;
+@Annotation2(param: '')
 import 'dart:collection';
 
 import 'package:dart_fixer_test/other.dart';
@@ -145,93 +147,94 @@ class B extends Other {
     assert.equal(values.imports[4].isRelative({ root: false }), true);
     assert.equal(values.imports[4].isFromPackage("dart_fixer_test"), false);
 
+    const defaultData = {
+      hide: [],
+      isExport: false,
+      show: [],
+      isOwnPackage: false,
+      as: null,
+      comment: null,
+      annotations: [],
+    };
     assert.deepStrictEqual(removeMatch(values.imports), [
+      // @meta.Annotation
+      // import 'dart:convert' as convert;
+      // @Annotation2(param: '')
+      // import 'dart:collection';
       {
+        ...defaultData,
         as: "convert",
-        hide: [],
-        isExport: false,
         path: "dart:convert",
-        show: [],
-        isOwnPackage: false,
+        annotations: [
+          {
+            qualifiedName: "meta.Annotation",
+            args: null,
+          },
+        ],
       },
       {
-        as: null,
-        hide: [],
-        isExport: false,
+        ...defaultData,
         path: "dart:collection",
-        show: [],
-        isOwnPackage: false,
+        annotations: [
+          {
+            qualifiedName: "Annotation2",
+            args: "(param: '')",
+          },
+        ],
       },
       {
-        as: null,
-        hide: [],
-        isExport: false,
+        ...defaultData,
         path: "package:dart_fixer_test/other.dart",
-        show: [],
         isOwnPackage: true,
       },
       // import '/other.dart' // other comment
       // as other   show Other ,showD;
       {
+        ...defaultData,
         as: "other",
-        hide: [],
-        isExport: false,
         path: "/other.dart",
         show: ["Other", "showD"],
         isOwnPackage: true,
       },
       {
-        as: null,
-        hide: [],
-        isExport: false,
+        ...defaultData,
         path: "./other.dart",
-        show: [],
         isOwnPackage: true,
       },
       {
-        as: null,
-        hide: [],
+        ...defaultData,
         isExport: true,
         path: "dart:async",
-        show: [],
-        isOwnPackage: false,
       },
       {
-        as: null,
+        ...defaultData,
         hide: ["Directory"],
         isExport: true,
         path: "dart:io",
-        show: [],
-        isOwnPackage: false,
       },
       {
-        as: null,
-        hide: [],
+        ...defaultData,
         isExport: true,
         path: "dart:collection",
         show: ["LinkedHashSet", "HashSet"],
-        isOwnPackage: false,
       },
       {
-        as: null,
-        hide: [],
+        ...defaultData,
         isExport: true,
         path: "dart:collection",
         show: ["HashMap"],
-        isOwnPackage: false,
       },
       {
-        as: null,
+        ...defaultData,
         hide: ["AsciiCodec"],
         isExport: true,
         path: "dart:convert",
         show: ["JsonCodec", "Utf8Codec"],
-        isOwnPackage: false,
       },
     ]);
   });
 
-  test("Dart Class", () => {
+  suite("Dart Class", () => {
     // TODO: mixins, interfaces
     const text = `
 class ///
@@ -351,67 +354,55 @@ class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __
     //     column: 61,
     //   },
     // });
-    assert.deepStrictEqual(removeMatch(values.classes, ["bracket"]), [
+    const defaultData = {
+      isAbstract: false,
+      generics: null,
+      extendsBound: null,
+      constructors: [],
+      fields: [],
+      methods: [],
+      mixins: [],
+      interfaces: [],
+      comment: null,
+      annotations: [],
+    };
+    const testClasses = [
       {
-        isAbstract: false,
+        ...defaultData,
         name: "Name",
-        generics: null,
-        extendsBound: null,
-        constructors: [],
-        fields: [],
-        methods: [],
-        mixins: [],
-        interfaces: [],
       },
       // abstract class Name2 extends
       // Other ///
       // {}
       {
+        ...defaultData,
         isAbstract: true,
         name: "Name2",
-        generics: null,
         extendsBound: "Other",
-        constructors: [],
-        fields: [],
-        methods: [],
-        mixins: [],
-        interfaces: [],
       },
       // class Name3<T> // comment
       // extends OtherG <T > {
       //  }
       {
-        isAbstract: false,
+        ...defaultData,
         name: "Name3",
         generics: "<T>",
         extendsBound: "OtherG <T >",
-        constructors: [],
-        fields: [],
-        methods: [],
-        mixins: [],
-        interfaces: [],
       },
       // class Name4< WP  extends String?>{
 
       // }
       {
-        isAbstract: false,
+        ...defaultData,
         name: "Name4",
         generics: "< WP  extends String?>",
-        extendsBound: null,
-        constructors: [],
-        fields: [],
-        methods: [],
-        mixins: [],
-        interfaces: [],
       },
       // class $N_ame5 extends Name4< Name3 <Name2>>{const $N_ame5();} abstract class __6Name_ {
 
       // }
       {
-        isAbstract: false,
+        ...defaultData,
         name: "$N_ame5",
-        generics: null,
         extendsBound: "Name4< Name3 <Name2>>",
         constructors: [
           {
@@ -420,28 +411,30 @@ class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __
             name: null,
             params: [],
             dartClass: values.classes[4],
+            body: null,
+            comment: null,
+            annotations: [],
           },
         ],
-        fields: [],
-        methods: [],
-        mixins: [],
-        interfaces: [],
       },
       {
+        ...defaultData,
         isAbstract: true,
         name: "__6Name_",
-        generics: null,
-        extendsBound: null,
-        constructors: [],
-        fields: [],
-        methods: [],
-        mixins: [],
-        interfaces: [],
       },
-    ]);
+    ];
+
+    testClasses.forEach((c, i) => {
+      test(c.name, () => {
+        assert.deepStrictEqual(
+          removeMatch([values.classes[i]], ["bracket"])[0],
+          c
+        );
+      });
+    });
   });
 
-  test("Dart Function", () => {
+  suite("Dart Function", () => {
     // TODO: isExternal, isOperator
     const text = `
 final str = '''
@@ -486,58 +479,68 @@ String func(G<B?> d) {
 `;
 
     const values = parseClassesAntlr(text);
-
     const classes = values.classes;
     const bClass = classes[0];
-    assert.strictEqual(bClass.name, "B");
-    assert.strictEqual(bClass.extendsBound, "Other");
-    assert.strictEqual(bClass.isAbstract, false);
 
-    assert.deepStrictEqual(removeMatch(bClass.fields), [
-      {
+    test("fields", () => {
+      assert.strictEqual(bClass.name, "B");
+      assert.strictEqual(bClass.extendsBound, "Other");
+      assert.strictEqual(bClass.isAbstract, false);
+
+      const defaultDataField = {
         isStatic: false,
-        isFinal: true,
-        name: "v",
+        isFinal: false,
         isVariable: false,
-        type: "int?",
         defaultValue: null,
         dartClass: bClass,
-      },
-      {
-        isStatic: false,
-        isFinal: true,
-        name: "value",
-        isVariable: false,
-        type: "String",
-        defaultValue: null,
-        dartClass: bClass,
-      },
-    ]);
+        comment: null,
+        annotations: [],
+      };
+      assert.deepStrictEqual(removeMatch(bClass.fields), [
+        {
+          ...defaultDataField,
+          isFinal: true,
+          name: "v",
+          type: "int?",
+        },
+        {
+          ...defaultDataField,
+          isFinal: true,
+          name: "value",
+          type: "String",
+        },
+      ]);
+    });
 
+    const defaultData = {
+      isStatic: false,
+      isGetter: false,
+      isSetter: false,
+      isExternal: false,
+      isOperator: false,
+      generics: null,
+      params: [],
+      dartClass: bClass,
+      comment: null,
+      annotations: [],
+    };
     const methods = [
       // bool get isVNull => v == null;
       {
-        isStatic: false,
+        ...defaultData,
         returnType: "bool",
         isGetter: true,
-        isSetter: false,
-        isExternal: false,
         isOperator: false,
         name: "isVNull",
-        generics: null,
         params: [],
-        dartClass: bClass,
+        body: "=> v == null;",
       },
       // int valueLength({bool? sum}) => value.length;
       {
-        isStatic: false,
+        ...defaultData,
         returnType: "int",
-        isGetter: false,
-        isSetter: false,
-        isExternal: false,
-        isOperator: false,
         name: "valueLength",
-        generics: null,
+        body: "=> value.length;",
         params: [
           {
             isRequired: false,
@@ -549,20 +552,15 @@ String func(G<B?> d) {
             dartFunction: bClass.methods[1],
           },
         ],
-        dartClass: bClass,
       },
       // Map<String , List<int >> valueLengthReq(
       //   Object v, { required bool? sum}) =>{}
       //   ;
       {
-        isStatic: false,
+        ...defaultData,
         returnType: "Map<String , List<int? >>",
-        isGetter: false,
-        isSetter: false,
-        isExternal: false,
-        isOperator: false,
         name: "valueLengthReq",
-        generics: null,
+        body: "=>{}\n    ;",
         params: [
           // Object v, { required bool? sum}
           {
@@ -582,19 +580,15 @@ String func(G<B?> d) {
             dartFunction: bClass.methods[2],
           },
         ],
-        dartClass: bClass,
       },
 
       // set isVNull(bool newValue) {}
       {
-        isStatic: false,
+        ...defaultData,
         returnType: null,
-        isGetter: false,
         isSetter: true,
-        isExternal: false,
-        isOperator: false,
         name: "isVNull",
-        generics: null,
+        body: "{}",
         params: [
           {
             isRequired: true,
@@ -605,18 +599,15 @@ String func(G<B?> d) {
             dartFunction: bClass.methods[3],
           },
         ],
-        dartClass: bClass,
       },
       // static compare<N extends num>(B self, [List<N>  def = const [2 ,]]) => self.isVNull;
       {
+        ...defaultData,
         isStatic: true,
-        isGetter: false,
-        isSetter: false,
-        isExternal: false,
-        isOperator: false,
         returnType: null,
         name: "compare",
         generics: "<N extends num>",
+        body: "=> self.isVNull;",
         params: [
           {
             isRequired: true,
@@ -635,18 +626,14 @@ String func(G<B?> d) {
             dartFunction: bClass.methods[4],
           },
         ],
-        dartClass: bClass,
       },
       // static int? compareInt([B? self]) => self?.v;
       {
+        ...defaultData,
         isStatic: true,
-        isGetter: false,
-        isSetter: false,
-        isExternal: false,
-        isOperator: false,
         returnType: "int?",
         name: "compareInt",
-        generics: null,
+        body: "=> self?.v;",
         params: [
           {
             isRequired: false,
@@ -657,41 +644,45 @@ String func(G<B?> d) {
             dartFunction: bClass.methods[5],
           },
         ],
-        dartClass: bClass,
       },
     ];
 
-    assert.deepStrictEqual(removeMatch(bClass.methods), methods);
+    methods.forEach((m, i) => {
+      test(`method ${m.name}`, () => {
+        assert.deepStrictEqual(removeMatch([bClass.methods[i]])[0], m);
+      });
+    });
 
-    assert.deepStrictEqual(removeMatch(values.functions), [
-      // String func(G<B?> d) {
-      //   return jsonDecode('{}');
-      // }
-      {
-        dartClass: null,
-        isStatic: false,
-        isGetter: false,
-        isSetter: false,
-        isExternal: false,
-        isOperator: false,
-        returnType: "String",
-        name: "func",
-        generics: null,
-        params: [
-          {
-            isRequired: true,
-            isNamed: false,
-            defaultValue: null,
-            name: "d",
-            type: "G<B?>",
-            dartFunction: values.functions[0],
-          },
-        ],
-      },
-    ]);
+    test(`function func`, () => {
+      assert.deepStrictEqual(removeMatch(values.functions), [
+        // String func(G<B?> d) {
+        //   return jsonDecode('{}');
+        // }
+        {
+          ...defaultData,
+          dartClass: null,
+          returnType: "String",
+          name: "func",
+          body: `\
+{
+  return jsonDecode('{}');
+}`,
+          params: [
+            {
+              isRequired: true,
+              isNamed: false,
+              defaultValue: null,
+              name: "d",
+              type: "G<B?>",
+              dartFunction: values.functions[0],
+            },
+          ],
+        },
+      ]);
+    });
   });
 
-  test("Dart Constructors", () => {
+  suite("Dart Constructors", () => {
     const text = `
 class B extends Other {
   final int? v;
@@ -732,335 +723,358 @@ class B extends Other {
     const values = parseClassesAntlr(text);
 
     const dartClass = values.classes[0];
-    assert.deepStrictEqual(
-      removeMatch(values.classes, ["bracket", "constructors"]),
-      [
+
+    test("Class", () => {
+      assert.deepStrictEqual(
+        removeMatch(values.classes, ["bracket", "constructors"]),
+        [
+          {
+            isAbstract: false,
+            name: "B",
+            generics: null,
+            extendsBound: "Other",
+            fields: [
+              {
+                isStatic: false,
+                isFinal: true,
+                name: "v",
+                isVariable: false,
+                type: "int?",
+                defaultValue: null,
+                dartClass: values.classes[0],
+                comment: null,
+                annotations: [],
+              },
+              {
+                isStatic: false,
+                isFinal: true,
+                name: "value",
+                isVariable: false,
+                type: "String",
+                defaultValue: null,
+                dartClass: values.classes[0],
+                comment: null,
+                annotations: [],
+              },
+            ],
+            methods: [],
+            mixins: [],
+            interfaces: [],
+            comment: null,
+            annotations: [],
+          },
+        ]
+      );
+    });
+
+    const defaultConstructor = {
+      isConst: false,
+      isFactory: false,
+      name: null,
+      dartClass: dartClass,
+      comment: null,
+      annotations: [],
+      body: null,
+    };
+    const defaultConstructorParam = {
+      isThis: false,
+      isSuper: false,
+      isRequired: false,
+      isNamed: false,
+      defaultValue: null,
+    };
+    test("Unnamed", () => {
+      const constructorUnnamed = dartClass.constructors.find(
+        (c) => c.name === null
+      );
+      assert.deepStrictEqual(removeMatch([constructorUnnamed], []), [
+        // B({
+        //   this.v = 3,
+        //   super.md = const [],
+        //   required this.value,
+        // });
         {
-          isAbstract: false,
-          name: "B",
-          generics: null,
-          extendsBound: "Other",
-          fields: [
+          ...defaultConstructor,
+          params: [
             {
-              isStatic: false,
-              isFinal: true,
+              ...defaultConstructorParam,
+              isThis: true,
+              isNamed: true,
+              defaultValue: "3",
               name: "v",
-              isVariable: false,
               type: "int?",
-              defaultValue: null,
-              dartClass: values.classes[0],
+              dartConstructor: constructorUnnamed,
             },
             {
-              isStatic: false,
-              isFinal: true,
+              ...defaultConstructorParam,
+              isSuper: true,
+              isNamed: true,
+              defaultValue: "const []",
+              name: "md",
+              type: null,
+              dartConstructor: constructorUnnamed,
+            },
+            {
+              ...defaultConstructorParam,
+              isThis: true,
+              isRequired: true,
+              isNamed: true,
               name: "value",
-              isVariable: false,
               type: "String",
-              defaultValue: null,
-              dartClass: values.classes[0],
+              dartConstructor: constructorUnnamed,
             },
           ],
-          methods: [],
-          mixins: [],
-          interfaces: [],
         },
-      ]
-    );
+      ]);
+    });
 
-    const constructorUnnamed = dartClass.constructors.find(
-      (c) => c.name === null
-    );
-    assert.deepStrictEqual(removeMatch([constructorUnnamed], []), [
-      // B({
-      //   this.v = 3,
-      //   super.md = const [],
-      //   required this.value,
-      // });
-      {
-        isConst: false,
-        isFactory: false,
-        name: null,
-        dartClass: dartClass,
-        params: [
-          {
-            isThis: true,
-            isSuper: false,
-            isRequired: false,
-            isNamed: true,
-            defaultValue: "3",
-            name: "v",
-            type: "int?",
-            dartConstructor: constructorUnnamed,
-          },
-          {
-            isThis: false,
-            isSuper: true,
-            isRequired: false,
-            isNamed: true,
-            defaultValue: "const []",
-            name: "md",
-            type: null,
-            dartConstructor: constructorUnnamed,
-          },
-          {
-            isThis: true,
-            isSuper: false,
-            isRequired: true,
-            isNamed: true,
-            defaultValue: null,
-            name: "value",
-            type: "String",
-            dartConstructor: constructorUnnamed,
-          },
-        ],
-      },
-    ]);
+    test("Named", () => {
+      const constructorNamed = dartClass.constructors.find(
+        (c) => c.name === "named"
+      );
+      assert.deepStrictEqual(removeMatch([constructorNamed], []), [
+        // /// comm
+        // const B.named({
+        //   ///
+        //   this.v = 3,
+        //   //
+        //   required List super.md,
+        //   this.value = """dd""",
+        // });
+        {
+          ...defaultConstructor,
+          isConst: true,
+          name: "named",
+          params: [
+            {
+              ...defaultConstructorParam,
+              isThis: true,
+              isNamed: true,
+              defaultValue: "3",
+              name: "v",
+              type: "int?",
+              dartConstructor: constructorNamed,
+            },
+            {
+              ...defaultConstructorParam,
+              isSuper: true,
+              isRequired: true,
+              isNamed: true,
+              name: "md",
+              type: "List",
+              dartConstructor: constructorNamed,
+            },
+            {
+              ...defaultConstructorParam,
+              isThis: true,
+              isNamed: true,
+              defaultValue: '"""dd"""',
+              name: "value",
+              type: "String",
+              dartConstructor: constructorNamed,
+            },
+          ],
+        },
+      ]);
+    });
 
-    const constructorNamed = dartClass.constructors.find(
-      (c) => c.name === "named"
-    );
-    assert.deepStrictEqual(removeMatch([constructorNamed], []), [
-      // /// comm
-      // const B.named({
-      //   ///
-      //   this.v = 3,
-      //   //
-      //   required List super.md,
-      //   this.value = """dd""",
-      // });
-      {
-        isConst: true,
-        isFactory: false,
-        name: "named",
-        dartClass: dartClass,
-        params: [
-          {
-            isThis: true,
-            isSuper: false,
-            isRequired: false,
-            isNamed: true,
-            defaultValue: "3",
-            name: "v",
-            type: "int?",
-            dartConstructor: constructorNamed,
-          },
-          {
-            isThis: false,
-            isSuper: true,
-            isRequired: true,
-            isNamed: true,
-            defaultValue: null,
-            name: "md",
-            type: "List",
-            dartConstructor: constructorNamed,
-          },
-          {
-            isThis: true,
-            isSuper: false,
-            isRequired: false,
-            isNamed: true,
-            defaultValue: '"""dd"""',
-            name: "value",
-            type: "String",
-            dartConstructor: constructorNamed,
-          },
-        ],
-      },
-    ]);
+    test("FactNamed", () => {
+      const constructorFactNamed = dartClass.constructors.find(
+        (c) => c.name === "factNamed"
+      );
+      assert.deepStrictEqual(removeMatch([constructorFactNamed], []), [
+        // factory B.factNamed(
+        //   int v, [
+        //   List<dynamic >? md,
+        //   String? value = null,
+        //   //
+        // ]) =>
+        //     B(value: value ?? '');
+        {
+          ...defaultConstructor,
+          isFactory: true,
+          name: "factNamed",
+          params: [
+            {
+              ...defaultConstructorParam,
+              isRequired: true,
+              name: "v",
+              type: "int",
+              dartConstructor: constructorFactNamed,
+            },
+            {
+              ...defaultConstructorParam,
+              name: "md",
+              type: "List<dynamic >?",
+              dartConstructor: constructorFactNamed,
+            },
+            {
+              ...defaultConstructorParam,
+              defaultValue: "null",
+              name: "value",
+              type: "String?",
+              dartConstructor: constructorFactNamed,
+            },
+          ],
+        },
+      ]);
+    });
 
-    const constructorFactNamed = dartClass.constructors.find(
-      (c) => c.name === "factNamed"
-    );
-    assert.deepStrictEqual(removeMatch([constructorFactNamed], []), [
-      // factory B.factNamed(
-      //   int v, [
-      //   List<dynamic >? md,
-      //   String? value = null,
-      //   //
-      // ]) =>
-      //     B(value: value ?? '');
-      {
-        isConst: false,
-        isFactory: true,
-        name: "factNamed",
-        dartClass: dartClass,
-        params: [
-          {
-            isThis: false,
-            isSuper: false,
-            isRequired: true,
-            isNamed: false,
-            defaultValue: null,
-            name: "v",
-            type: "int",
-            dartConstructor: constructorFactNamed,
-          },
-          {
-            isThis: false,
-            isSuper: false,
-            isRequired: false,
-            isNamed: false,
-            defaultValue: null,
-            name: "md",
-            type: "List<dynamic >?",
-            dartConstructor: constructorFactNamed,
-          },
-          {
-            isThis: false,
-            isSuper: false,
-            isRequired: false,
-            isNamed: false,
-            defaultValue: "null",
-            name: "value",
-            type: "String?",
-            dartConstructor: constructorFactNamed,
-          },
-        ],
-      },
-    ]);
-
-    const constructorConstFactNamed = dartClass.constructors.find(
-      (c) => c.name === "constFactNamed"
-    );
-    assert.deepStrictEqual(removeMatch([constructorConstFactNamed], []), [
-      // const factory B.constFactNamed(
-      //   int v,
-      //   String value, [
-      //   List<String>? md,
-      // ]) = BOther //
-      {
-        isConst: true,
-        isFactory: true,
-        name: "constFactNamed",
-        dartClass: dartClass,
-        params: [
-          {
-            isThis: false,
-            isSuper: false,
-            isRequired: true,
-            isNamed: false,
-            defaultValue: null,
-            name: "v",
-            type: "int",
-            dartConstructor: constructorConstFactNamed,
-          },
-          {
-            isThis: false,
-            isSuper: false,
-            isRequired: true,
-            isNamed: false,
-            defaultValue: null,
-            name: "value",
-            type: "String",
-            dartConstructor: constructorConstFactNamed,
-          },
-          {
-            isThis: false,
-            isSuper: false,
-            isRequired: false,
-            isNamed: false,
-            defaultValue: null,
-            name: "md",
-            type: "List<String>?",
-            dartConstructor: constructorConstFactNamed,
-          },
-        ],
-      },
-    ]);
+    test("ConstFactNamed", () => {
+      const constructorConstFactNamed = dartClass.constructors.find(
+        (c) => c.name === "constFactNamed"
+      );
+      assert.deepStrictEqual(removeMatch([constructorConstFactNamed], []), [
+        // const factory B.constFactNamed(
+        //   int v,
+        //   String value, [
+        //   List<String>? md,
+        // ]) = BOther //
+        {
+          ...defaultConstructor,
+          isConst: true,
+          isFactory: true,
+          name: "constFactNamed",
+          params: [
+            {
+              ...defaultConstructorParam,
+              isRequired: true,
+              name: "v",
+              type: "int",
+              dartConstructor: constructorConstFactNamed,
+            },
+            {
+              ...defaultConstructorParam,
+              isRequired: true,
+              name: "value",
+              type: "String",
+              dartConstructor: constructorConstFactNamed,
+            },
+            {
+              ...defaultConstructorParam,
+              name: "md",
+              type: "List<String>?",
+              dartConstructor: constructorConstFactNamed,
+            },
+          ],
+        },
+      ]);
+    });
   });
 
-  test("Dart Type", () => {
-    const typeMap1 = new DartType("Map< String, int?>");
-    assert.deepStrictEqual(removeMatch([typeMap1])[0], {
-      text: "Map<String,int?>",
-      name: "Map",
-      generics: [
+  suite("Dart Type", () => {
+    test("Map", () => {
+      const typeMap1 = new DartType("import_name.Map< String, int?>");
+      assert.deepStrictEqual(removeMatch([typeMap1])[0], {
+        text: "import_name.Map<String,int?>",
+        name: "Map",
+        importPrefix: "import_name",
+        generics: [
+          {
+            text: "String",
+            name: "String",
+            importPrefix: null,
+            generics: [],
+          },
+          {
+            text: "int?",
+            name: "int",
+            importPrefix: null,
+            generics: [],
+          },
+        ],
+      });
+    });
+
+    test("Complex Map", () => {
+      const typeMap2 = new DartType(
+        "Map< List<List<import_value.DateTime>?>, List<Map<int?, P>>>?"
+      );
+      assert.strictEqual(typeMap2.isNullable, true);
+      assert.deepStrictEqual(removeMatch([typeMap2])[0], {
+        text: "Map<List<List<import_value.DateTime>?>,List<Map<int?,P>>>?",
+        name: "Map",
+        importPrefix: null,
+        generics: [
+          {
+            text: "List<List<import_value.DateTime>?>",
+            name: "List",
+            importPrefix: null,
+            generics: [
+              {
+                text: "List<import_value.DateTime>?",
+                name: "List",
+                importPrefix: null,
+                generics: [
+                  {
+                    text: "import_value.DateTime",
+                    name: "DateTime",
+                    importPrefix: "import_value",
+                    generics: [],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            text: "List<Map<int?,P>>",
+            name: "List",
+            importPrefix: null,
+            generics: [
+              {
+                text: "Map<int?,P>",
+                name: "Map",
+                importPrefix: null,
+                generics: [
+                  {
+                    text: "int?",
+                    name: "int",
+                    importPrefix: null,
+                    generics: [],
+                  },
+                  {
+                    text: "P",
+                    name: "P",
+                    importPrefix: null,
+                    generics: [],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    test("String", () => {
+      const typeString = new DartType("String");
+      assert.strictEqual(typeString.isString, true);
+      assert.strictEqual(typeString.isNullable, false);
+      assert.deepStrictEqual(
+        { ...typeString },
         {
           text: "String",
           name: "String",
           generics: [],
-        },
+          importPrefix: null,
+        }
+      );
+    });
+
+    test("p.String?", () => {
+      const typeStringNull = new DartType("p.String?");
+      assert.strictEqual(typeStringNull.isString, true);
+      assert.strictEqual(typeStringNull.isNullable, true);
+      assert.deepStrictEqual(
+        { ...typeStringNull },
         {
-          text: "int?",
-          name: "int",
+          text: "p.String?",
+          name: "String",
           generics: [],
-        },
-      ],
+          importPrefix: "p",
+        }
+      );
     });
-
-    const typeMap2 = new DartType(
-      "Map< List<List<DateTime>?>, List<Map<int?, P>>>?"
-    );
-    assert.strictEqual(typeMap2.isNullable, true);
-    assert.deepStrictEqual(removeMatch([typeMap2])[0], {
-      text: "Map<List<List<DateTime>?>,List<Map<int?,P>>>?",
-      name: "Map",
-      generics: [
-        {
-          text: "List<List<DateTime>?>",
-          name: "List",
-          generics: [
-            {
-              text: "List<DateTime>?",
-              name: "List",
-              generics: [
-                {
-                  text: "DateTime",
-                  name: "DateTime",
-                  generics: [],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          text: "List<Map<int?,P>>",
-          name: "List",
-          generics: [
-            {
-              text: "Map<int?,P>",
-              name: "Map",
-              generics: [
-                {
-                  text: "int?",
-                  name: "int",
-                  generics: [],
-                },
-                {
-                  text: "P",
-                  name: "P",
-                  generics: [],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    });
-
-    const typeString = new DartType("String");
-    assert.strictEqual(typeString.isString, true);
-    assert.strictEqual(typeString.isNullable, false);
-    assert.deepStrictEqual(
-      { ...typeString },
-      {
-        text: "String",
-        name: "String",
-        generics: [],
-      }
-    );
-
-    const typeStringNull = new DartType("String?");
-    assert.strictEqual(typeStringNull.isString, true);
-    assert.strictEqual(typeStringNull.isNullable, true);
-    assert.deepStrictEqual(
-      { ...typeStringNull },
-      {
-        text: "String?",
-        name: "String",
-        generics: [],
-      }
-    );
   });
 });
 
