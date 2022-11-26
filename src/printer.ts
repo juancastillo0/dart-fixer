@@ -440,6 +440,81 @@ enum ${className}Fields {
 `;
 };
 
+export const printMobx = (dartClass: DartClass): DartClass => {
+  const obs = "Observable";
+  const newClass = new DartClass({
+    bracket: null,
+    name: `${dartClass.name}${obs}`,
+  });
+  const defaultConstructor = makeConstructorFromFields(newClass);
+  defaultConstructor.params.forEach((p) => (p.isThis = false));
+  defaultConstructor.isConst = false;
+  defaultConstructor.body = `\
+:${dartClass.fieldsNotStatic
+    // TODO: use f.defaultValue
+    .map((f) => `_${f.name} = ${obs}(${f.name})`)
+    .join(",")};
+`;
+  newClass.constructors.push(defaultConstructor);
+
+  newClass.fields.push(
+    ...dartClass.fieldsNotStatic.map(
+      (f) =>
+        new DartField(
+          {
+            name: `${f.name}${obs}`,
+            // TODO: ObservableMap, ObservableList, ObservableSet
+            type: `${obs}<${f.type ?? `Object${question}`}>`,
+            isFinal: true,
+            isVariable: false,
+          },
+          newClass
+        )
+    )
+  );
+  newClass.methods.push(
+    ...dartClass.fieldsNotStatic.map(
+      (f) =>
+        new DartFunction(
+          {
+            name: f.name,
+            returnType: f.type,
+            body: `=> ${f.name}${obs}.value;`,
+            isGetter: true,
+          },
+          newClass
+        )
+    ),
+    ...dartClass.fieldsNotStatic.map((f) => {
+      const func = new DartFunction(
+        {
+          name: f.name,
+          returnType: null,
+          body: `=> ${f.name}${obs}.value = value;`,
+          isSetter: true,
+          params: [],
+        },
+        newClass
+      );
+      func.params.push(
+        new DartFunctionParam(
+          {
+            defaultValue: null,
+            isNamed: false,
+            isRequired: true,
+            name: "value",
+            type: f.type,
+          },
+          func
+        )
+      );
+      return func;
+    })
+  );
+
+  return newClass;
+};
+
 const nullableType = (type: string | null): string =>
   `${!type?.endsWith("?") ? `${type ?? "Object"}${question}` : type}`;
 
