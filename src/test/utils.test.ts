@@ -17,4 +17,11 @@ suite("Utils", () => {
   test("recase schema_1_schema1", () => {
     assert.equal(recase("schema_1_schema1", "PascalCase"), "Schema1Schema1");
   });
+
+  test("recase schema_10.45.3_schema-1.2_schema1.2", () => {
+    assert.equal(
+      recase("schema_10.45.3-schema-1.2_schema1.2", "PascalCase"),
+      "Schema10_45_3Schema1_2Schema1_2"
+    );
+  });
 });
