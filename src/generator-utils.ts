@@ -1,30 +1,28 @@
 import * as vscode from "vscode";
 import { EXTENSION_NAME } from "./extension";
+import { CleanedText, TextPosition } from "./parser-utils";
 
 export interface GeneratedSection {
   md5Hash: string;
-  start: vscode.Position;
-  end?: vscode.Position;
+  start: TextPosition;
+  end?: TextPosition;
 }
-const SECTION_PREFIX = "// generated-dart-fixer-";
+
+const SECTION_REGEXP =
+  /\/\/ generated-dart-fixer-(?<kind>start|end)(?<json>{[^\r\n]*})([\r\n]|$)/g;
 
 export const getGeneratedSections = (
-  document: vscode.TextDocument
+  text: string,
+  cleanText: CleanedText
 ): Map<string, GeneratedSection> => {
-  const generated = [
-    ...document.getText().matchAll(new RegExp(SECTION_PREFIX, "g")),
-  ];
+  const generated = [...text.matchAll(SECTION_REGEXP)];
   const generatedSections = new Map<string, GeneratedSection>();
-  const _startPrefix = `${SECTION_PREFIX}start`;
-  const _endPrefix = `${SECTION_PREFIX}end`;
   for (const match of generated) {
-    const linePosition = document.positionAt(match.index!);
-    const line = document.lineAt(linePosition.line).text;
-    const isStart = line.startsWith(_startPrefix);
+    const linePosition = cleanText.mapIndex(match.index!);
+    const line = match[0];
+    const isStart = match.groups!["kind"] === "start";
     try {
-      const dataString = line.substring(
-        (isStart ? _startPrefix : _endPrefix).length
-      );
+      const dataString = match.groups!["json"];
       const data = JSON.parse(dataString) as {
         md5Hash: string | undefined;
       };
