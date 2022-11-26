@@ -58,9 +58,15 @@ const dartClassFromJson = (
   }
 
   Object.entries(schema.definitions ?? {}).forEach(([name, type]) => {
-    const value = dartClassFromJson(addPathToCtx(name, ctx), type);
+    const newCtx = addPathToCtx(name, ctx);
+    // Remove file name for types in definitions
+    newCtx.path.splice(0, 1);
+    const value = dartClassFromJson(newCtx, type);
     if ("primitive" in value) {
-      ctx.primitiveRefs.set(name, value.primitive);
+      ctx.primitiveRefs.set(
+        name,
+        `${value.primitive}${type.nullable ? question : ""}`
+      );
     }
   });
 
@@ -136,16 +142,18 @@ const dartClassFromJson = (
     return enu;
   } else if ("elements" in schema) {
     const typeValue = dartClassFromJson(ctx, schema.elements);
+    const typeName =
+      "primitive" in typeValue ? typeValue.primitive : typeValue.name;
     return {
-      primitive: `List<${
-        "primitive" in typeValue ? typeValue.primitive : typeValue.name
-      }>`,
+      primitive: `List<${typeName}${schema.elements.nullable ? question : ""}>`,
     };
   } else if ("values" in schema) {
     const typeValue = dartClassFromJson(ctx, schema.values);
+    const typeName =
+      "primitive" in typeValue ? typeValue.primitive : typeValue.name;
     return {
-      primitive: `Map<String, ${
-        "primitive" in typeValue ? typeValue.primitive : typeValue.name
+      primitive: `Map<String, ${typeName}${
+        schema.values.nullable ? question : ""
       }>`,
     };
   } else if ("discriminator" in schema) {
