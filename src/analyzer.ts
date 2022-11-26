@@ -80,8 +80,25 @@ export class DartAnalyzer {
       }
     }
     if (value instanceof DartTypeAlias) {
-      // TODO:
-      throw new Error("TODO: Support type alias in DartAnalyzer.resolve");
+      const newType = new DartType(value.type);
+      const leftType = new DartType(`${value.name}${value.generics ?? ""}`);
+      const genericName = leftType.generics.find(
+        (g) => g.name === newType.name
+      );
+      if (genericName) {
+        // TODO:
+        throw new Error(
+          "TODO: Support type alias generic in DartAnalyzer.resolve"
+        );
+      } else {
+        const resolvedAlias = this.resolveType({
+          file: params.file,
+          dartType: newType,
+        });
+        if (resolvedAlias) {
+          return resolvedAlias;
+        }
+      }
     }
     return value;
   };
@@ -128,7 +145,7 @@ export class DartAnalyzer {
   }
 
   getData = async (
-    document: vscode.TextDocument
+    document: { getText: () => string; uri: vscode.Uri; version: number } // vscode.TextDocument
   ): Promise<
     | { data: ParsedDartFileData; didChange: boolean; error?: undefined }
     | { error: object }
@@ -179,11 +196,16 @@ export class DartAnalyzer {
         });
         if (uri) {
           console.log("uri ", uri);
-          await vscode.workspace.openTextDocument(uri);
-          // TODO:
+          try {
+            // TODO:
+            const importDoc = await vscode.workspace.openTextDocument(uri);
+            await this.getData(importDoc);
+          } catch (error) {
+            console.error(error);
+          }
         }
       }
-      const generatedSections = getGeneratedSections(document);
+      const generatedSections = getGeneratedSections(text, values.cleanText);
       data = {
         values,
         generatedSections,

@@ -12,7 +12,6 @@ import {
   DartFunction,
   DartFunctionParam,
   DartType,
-  DartTypeAlias,
 } from "./parser";
 
 export interface GenerationOptions {
@@ -221,7 +220,13 @@ const fromJsonValue = (
       file: options.params.outputFile,
       dartType,
     });
-    if (typeDef && !(typeDef instanceof DartTypeAlias)) {
+    if (typeDef && typeDef.kind === DartDefKind.alias) {
+      return fromJsonValue({
+        dartType: new DartType(typeDef.type),
+        getter: getter,
+        params: options.params,
+      });
+    } else if (typeDef) {
       const functionName = "fromJson";
       const fromJsonStatic = typeDef.methods.find(
         (m) => m.name === functionName && m.isStatic && m.params.length === 1

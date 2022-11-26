@@ -136,10 +136,45 @@ export const createDartModelFromJTD = async (
     }
   }
 
+  let dartFileText = generateDartFileFromJsonData({
+    ctx,
+    fileName,
+    analyzer,
+    newFile,
+  });
+  if (analyzer) {
+    const value = await analyzer.getData({
+      getText: () => dartFileText,
+      uri: newFile,
+      version: 0,
+    });
+    if (!value.error) {
+      dartFileText = generateDartFileFromJsonData({
+        ctx,
+        fileName,
+        analyzer,
+        newFile,
+      });
+    }
+  }
+
+  const edit = new vscode.WorkspaceEdit();
+  edit.createFile(newFile, { overwrite: true });
+  edit.insert(newFile, new vscode.Position(0, 0), dartFileText);
+  return edit;
+};
+
+const generateDartFileFromJsonData = (params: {
+  ctx: JsonSchemaCtx;
+  fileName: string;
+  analyzer: DartAnalyzer | undefined;
+  newFile: vscode.Uri;
+}): string => {
+  const ctx = params.ctx;
   const printer = new DartModelPrinter();
   const classes = [...ctx.classes.values()];
   const dartFileText = `\
-// generated from "./${fileName}"
+// generated from "./${params.fileName}"
 ${[...ctx.imports.values()].join("\n")}\
 
 ${classes
@@ -152,9 +187,9 @@ ${classes
           generate(
             classes[i],
             {},
-            analyzer && {
-              analyzer,
-              outputFile: newFile.toString(),
+            params.analyzer && {
+              analyzer: params.analyzer,
+              outputFile: params.newFile.toString(),
             }
           ).content
         }`
@@ -165,9 +200,5 @@ ${[...ctx.primitiveRefs.entries()]
   .map(([name, type]) => `typedef ${name} = ${type};`)
   .join("\n\n")}
 `;
-
-  const edit = new vscode.WorkspaceEdit();
-  edit.createFile(newFile, { overwrite: true });
-  edit.insert(newFile, new vscode.Position(0, 0), dartFileText);
-  return edit;
+  return dartFileText;
 };
