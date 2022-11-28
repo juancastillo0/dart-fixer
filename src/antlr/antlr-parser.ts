@@ -44,6 +44,7 @@ import {
   ANTLRInputStream,
   CommonTokenStream,
   ParserRuleContext,
+  Token,
 } from "antlr4ts";
 import {
   DartClass,
@@ -65,56 +66,108 @@ import {
   DartMetadata,
 } from "../parser";
 import { Interval } from "antlr4ts/misc/Interval";
-import { cleanRawText } from "../parser-utils";
+import {
+  binarySearch,
+  BracketWithOriginal,
+  cleanRawText,
+} from "../parser-utils";
 import { zip } from "../utils";
 
-export interface ParseCtx {
+interface LexerComment {
+  kind: "multiline" | "singleline";
+  text: string;
+  line: number;
+  index: number;
+  column: number;
+}
+
+export class ParseCtx {
   inputStream: ANTLRInputStream;
   lexer: DartLexer;
   tokenStream: CommonTokenStream;
   parser: DartParser;
   tree: LibraryDefinitionContext;
+  comments: Array<LexerComment>;
 
-  getIntervalText: <T extends ParserRuleContext | undefined>(
-    rule: T
-  ) => T extends undefined ? null : string;
-}
+  constructor(text: string) {
+    this.inputStream = new ANTLRInputStream(text);
+    this.lexer = new DartLexer(this.inputStream);
+    this.tokenStream = new CommonTokenStream(this.lexer);
+    this.parser = new DartParser(this.tokenStream);
+    this.tree = this.parser.libraryDefinition();
+    this.comments = this.lexer.comments as Array<LexerComment>;
+  }
 
-export const parseLibrary = (text: string): ParseCtx => {
-  const inputStream = new ANTLRInputStream(text);
-  const lexer = new DartLexer(inputStream);
-  const tokenStream = new CommonTokenStream(lexer);
-  const parser = new DartParser(tokenStream);
-  const tree: LibraryDefinitionContext = parser.libraryDefinition();
-
-  const getIntervalText = <T extends ParserRuleContext | undefined>(
+  getIntervalText = <T extends ParserRuleContext | undefined>(
     rule: T
   ): T extends undefined ? null : string => {
     return (
       rule?.sourceInterval
-        ? inputStream.getText(
+        ? this.inputStream.getText(
             new Interval(rule.start.startIndex, rule.stop!.stopIndex)
           )
         : null
     ) as T extends undefined ? null : string;
   };
 
-  return {
-    inputStream,
-    lexer,
-    tokenStream,
-    parser,
-    tree,
-    getIntervalText,
+  areNextToEachOther = (start: number, end: number): boolean => {
+    if (start > end + 1) {
+      return false;
+    }
+    const between = this.inputStream.getText(new Interval(start, end));
+    return (
+      between.match(/^\s*$/g) !== null &&
+      [...between.matchAll(/\n/g)].length <= 1
+    );
   };
-};
+
+  getComment = (rule: ParserRuleContext | Token | number): string | null => {
+    const startIndex =
+      rule instanceof ParserRuleContext
+        ? rule.start.startIndex
+        : typeof rule === "number"
+        ? rule
+        : rule.startIndex;
+    const found = binarySearch(this.comments, (a) => startIndex - a.index);
+    const comment = found.item ?? this.comments[found.index];
+    if (!comment || !this.areNextToEachOther(comment.index, startIndex - 1)) {
+      return null;
+    }
+    if (comment.kind === "multiline") {
+      return comment.text;
+    }
+    const list = [comment];
+    let index = found.index;
+    while (index > 0) {
+      index--;
+      const current = this.comments[index];
+      const prev = list[list.length - 1];
+      if (
+        current.kind === "singleline" &&
+        this.areNextToEachOther(
+          current.index,
+          prev.index - prev.text.length - 1
+        ) &&
+        prev.text.match(/^\/\/\/?/)![0] === current.text.match(/^\/\/\/?/)![0]
+      ) {
+        list.push(current);
+      } else {
+        break;
+      }
+    }
+    return list
+      .map((c) => c.text)
+      .reverse()
+      .join("");
+  };
+}
 
 export const parseClassesAntlr = (
   text: string,
   config?: DartParserConfig
 ): DartImports => {
   // Create the lexer and parser
-  const ctx = parseLibrary(text);
+  const ctx = new ParseCtx(text);
   const { tree, getIntervalText } = ctx;
 
   const importOrExport = tree.importOrExport();
@@ -136,8 +189,9 @@ export const parseClassesAntlr = (
 
   while (defIndex < definitionsForTopLevel.length) {
     const def = definitionsForTopLevel[defIndex];
-    const annotations = getMetadata(
+    const data = baseDataFromRule(
       ctx,
+      def,
       metadataForTopLevel[defIndex++].metadatum()
     );
 
@@ -152,13 +206,13 @@ export const parseClassesAntlr = (
     const typeAlias = def.typeAlias();
 
     if (classDec) {
-      classes.push(mapClass(ctx, classDec, annotations));
+      classes.push(mapClass(ctx, classDec, data));
     } else if (functionSignature) {
       functions.push(
         mapFunction(ctx, {
           signature: functionSignature,
           context: def,
-          annotations,
+          data,
         })
       );
     } else if (typeAlias) {
@@ -168,7 +222,7 @@ export const parseClassesAntlr = (
 
       typeAliases.push(
         new DartTypeAlias({
-          annotations,
+          ...data,
           name: name.text,
           generics: getIntervalText(
             typeAlias.typeParameters() ??
@@ -196,13 +250,13 @@ export const parseClassesAntlr = (
           break;
         case TypeDefinitionKind.mixin: {
           const mixin = new DartMixin({
+            ...data,
             generics: getIntervalText(typeDef.typeParameters),
             on: typeDef.mixins?.map(getIntervalText) ?? [],
             interfaces: typeDef.interfaces?.map(getIntervalText) ?? [],
             name: typeDef.typeIdentifier!.text,
             fields: [],
             methods: [],
-            annotations,
           });
           setClassMemberLists(ctx, typeDef.classMemberDefinitions, mixin);
           mixins.push(mixin);
@@ -210,12 +264,12 @@ export const parseClassesAntlr = (
         }
         case TypeDefinitionKind.extension: {
           const extension = new DartExtension({
+            ...data,
             generics: getIntervalText(typeDef.typeParameters),
             on: getIntervalText(typeDef.onExtension!),
             name: typeDef.typeIdentifier?.text ?? null,
             fields: [],
             methods: [],
-            annotations,
           });
           setClassMemberLists(ctx, typeDef.classMemberDefinitions, extension);
           extensions.push(extension);
@@ -223,6 +277,7 @@ export const parseClassesAntlr = (
         }
         case TypeDefinitionKind.enum: {
           const enumValue = new DartEnum({
+            ...data,
             generics: getIntervalText(typeDef.typeParameters),
             name: typeDef.typeIdentifier!.text,
             fields: [],
@@ -244,7 +299,6 @@ export const parseClassesAntlr = (
             })),
             interfaces: typeDef.interfaces?.map(getIntervalText) ?? [],
             mixins: typeDef.mixins?.map(getIntervalText) ?? [],
-            annotations,
           });
           setClassMemberLists(ctx, typeDef.classMemberDefinitions, enumValue);
           enums.push(enumValue);
@@ -253,7 +307,7 @@ export const parseClassesAntlr = (
       }
     } else {
       // Field
-      fields.push(...mapField(ctx, def, null, annotations));
+      fields.push(...mapField(ctx, def, null, data));
     }
   }
 
@@ -294,7 +348,13 @@ export interface TypeDefinition {
   classMemberDefinitions: Array<Annotated<ClassMemberDefinitionContext>>;
 }
 
-type Annotated<T> = [T, Array<DartMetadata>];
+interface DefBaseData {
+  comment: string | null;
+  annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
+}
+
+type Annotated<T> = [T, DefBaseData];
 
 const parseTypeDefinition = (
   ctx: ParseCtx,
@@ -326,7 +386,9 @@ const parseTypeDefinition = (
     kind,
     classMemberDefinitions: zip(
       definitions,
-      context.metadata().map((m) => getMetadata(ctx, m.metadatum()))
+      context
+        .metadata()
+        .map((m, i) => baseDataFromRule(ctx, definitions[i], m.metadatum()))
     ),
     ABSTRACT:
       context instanceof ClassDeclarationContext
@@ -385,17 +447,18 @@ export const mapContextToDartImport = (
   const val = (elem.libraryImport()?.importSpecification() ??
     elem.libraryExport())!;
 
-  const annotations = getMetadata(
+  const data = baseDataFromRule(
     ctx,
+    elem,
     (elem.libraryImport()?.metadata() ??
       elem.libraryExport()?.metadata())!.metadatum()
   );
   const isExport = val instanceof LibraryExportContext;
   return new DartImport(
     {
+      ...data,
       as: isExport ? null : val.identifier()?.text ?? null,
       isExport,
-      annotations,
       hide: val
         .combinator()
         .filter((c) => !!c.HIDE())
@@ -427,13 +490,14 @@ export const mapContextToDartImport = (
 const mapClass = (
   ctx: ParseCtx,
   classDec: ClassDeclarationContext,
-  annotations: Array<DartMetadata>
+  baseData: DefBaseData
 ): DartClass => {
   const { getIntervalText } = ctx;
   const typeWithParameters = (classDec.typeWithParameters() ??
     classDec?.mixinApplicationClass()?.typeWithParameters())!;
 
   const data: DartClassData = {
+    ...baseData,
     isAbstract: !!classDec.ABSTRACT(),
     extendsBound: getIntervalText(
       classDec.superclass()?.typeNotVoidNotFunction()
@@ -455,35 +519,59 @@ const mapClass = (
     fields: [],
     constructors: [],
     methods: [],
-    annotations,
-    // TODO: support comments
-    comment: null,
-    bracket: {
-      children: [],
-      start: classDec.start.startIndex,
-      end: classDec.stop!.stopIndex,
-      originalEnd: {
-        index: classDec.stop!.stopIndex,
-        line: classDec.stop!.line,
-        column: classDec.stop!.charPositionInLine,
-      },
-      originalStart: {
-        index: classDec.start.stopIndex,
-        line: classDec.start.line,
-        column: classDec.start.charPositionInLine,
-      },
-    },
   };
   const dartClass = new DartClass(data);
+  const definitions = classDec.classMemberDefinition();
   setClassMemberLists(
     ctx,
     zip(
-      classDec.classMemberDefinition(),
-      classDec.metadata().map((m) => getMetadata(ctx, m.metadatum()))
+      definitions,
+      classDec
+        .metadata()
+        .map((m, i) => baseDataFromRule(ctx, definitions[i], m.metadatum()))
     ),
     dartClass
   );
   return dartClass;
+};
+
+const baseDataFromRule = (
+  ctx: ParseCtx,
+  rule: ParserRuleContext,
+  metadatum: Array<MetadatumContext>
+): DefBaseData => {
+  const annotations = getMetadata(ctx, metadatum);
+  let comment = ctx.getComment(rule);
+  let i = 0;
+  while (!comment && i < metadatum.length) {
+    comment = ctx.getComment(metadatum[i++]);
+  }
+  const data: DefBaseData = {
+    annotations,
+    comment,
+    bracket: bracketFromToken(rule),
+  };
+  return data;
+};
+
+const bracketFromToken = (rule: ParserRuleContext): BracketWithOriginal => {
+  const start = rule.start;
+  const stop = rule.stop!;
+  return {
+    children: [],
+    start: start.startIndex,
+    end: stop.stopIndex,
+    originalEnd: {
+      index: stop.stopIndex,
+      line: stop.line,
+      column: stop.charPositionInLine,
+    },
+    originalStart: {
+      index: start.stopIndex,
+      line: start.line,
+      column: start.charPositionInLine,
+    },
+  };
 };
 
 const mapFunction = (
@@ -492,12 +580,12 @@ const mapFunction = (
     signature,
     context,
     dartClass,
-    annotations,
+    data,
   }: {
     signature: AntlrFunctionContext;
     context: ClassMemberDefinitionContext | TopLevelDefinitionContext;
     dartClass?: DartTypeScope;
-    annotations: Array<DartMetadata>;
+    data: DefBaseData;
   }
 ): DartFunction => {
   const methodSignature = getAntlrFunction(signature, context);
@@ -508,6 +596,7 @@ const mapFunction = (
 
   const dartFunction = new DartFunction(
     {
+      ...data,
       body: ctx.getIntervalText(context.functionBody()),
       isGetter: signature instanceof GetterSignatureContext,
       isSetter: signature instanceof SetterSignatureContext,
@@ -524,7 +613,6 @@ const mapFunction = (
             )
           : null) ?? null,
       params: [],
-      annotations,
     },
     dartClass ?? null
   );
@@ -856,10 +944,10 @@ function setClassMemberLists(
 
   classMemberDefinitions
     .filter(([c]) => !c.methodSignature() && !isMethod(c))
-    .forEach(([c, annotations]) => {
+    .forEach(([c, data]) => {
       const dec = c.declaration()!;
       if (dec) {
-        dartClass.fields.push(...mapField(ctx, dec, dartClass, annotations));
+        dartClass.fields.push(...mapField(ctx, dec, dartClass, data));
       } else {
         // TODO: delete this
         console.log("Non field", c);
@@ -887,14 +975,14 @@ function setClassMemberLists(
   dartClass.methods.push(
     ...classMemberDefinitions
       .filter(([m]) => isMethod(m))
-      .map(([m, annotations]) => {
+      .map(([m, data]) => {
         const context = getMethodSignature(m);
         const methodSignature = getAntlrFunction(context, m);
         const dartFunction = mapFunction(ctx, {
           signature: context,
           context: m,
           dartClass,
-          annotations,
+          data,
         });
         if (dartFunction.name === dartClass.name) {
           constructorMethods.set(dartFunction, {
@@ -911,10 +999,11 @@ function setClassMemberLists(
     dartClass.constructors.push(
       ...classMemberDefinitions
         .filter(([m]) => isConstructor(m))
-        .map(([m, annotations]) => {
+        .map(([m, data]) => {
           const context = getConstructor(m);
           const body = ctx.getIntervalText(context.redirectionOrInitializers);
           const dartConstructor = new DartConstructor({
+            ...data,
             dartClass,
             // TODO: verify `;`
             body: body ? `${body};` : null,
@@ -930,7 +1019,6 @@ function setClassMemberLists(
               context.constructorSignature instanceof
                 FactoryConstructorSignatureContext,
             params: [],
-            annotations,
           });
           dartConstructor.params.push(
             ...getParameters(
@@ -997,7 +1085,7 @@ function mapField(
   ctx: ParseCtx,
   dec: DeclarationContext | TopLevelDefinitionContext,
   dartClass: DartTypeScope | null,
-  annotations: Array<DartMetadata>
+  data: DefBaseData
 ): Array<DartField> {
   // |    EXTERNAL finalVarOrType identifierList ';'
   // |    (FINAL | CONST) type? staticFinalDeclarationList ';'
@@ -1054,10 +1142,10 @@ function mapField(
   return identifierList.map((id) => {
     return new DartField(
       {
+        ...data,
         ...values,
         name: id.name,
         defaultValue: id.defaultValue ?? null,
-        annotations,
       },
       dartClass
     );

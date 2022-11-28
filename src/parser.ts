@@ -31,10 +31,11 @@ export enum DartDefKind {
 
 export type DartTypeScope = DartClass | DartMixin | DartEnum | DartExtension;
 
-interface DartDefBase {
+export interface DartDefBase {
   get kind(): DartDefKind;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 }
 
 export interface DartMetadata {
@@ -148,6 +149,7 @@ export interface DartImportData {
   path: string;
   annotations: Array<DartMetadata>;
   comment: string | null;
+  bracket: BracketWithOriginal | null;
 }
 
 export class DartImport implements DartImportData, DartDefBase {
@@ -162,6 +164,7 @@ export class DartImport implements DartImportData, DartDefBase {
   isOwnPackage: boolean;
   annotations: Array<DartMetadata>;
   comment: string | null;
+  bracket: BracketWithOriginal | null;
 
   isFromPackage = (packageName: string): boolean =>
     this.path.startsWith(`package:${packageName}/`);
@@ -195,6 +198,7 @@ export class DartImport implements DartImportData, DartDefBase {
     this.path = params.path;
     this.annotations = params.annotations ?? [];
     this.comment = params.comment ?? null;
+    this.bracket = params.bracket ?? null;
 
     this.isOwnPackage =
       (config?.packageName && this.isFromPackage(config.packageName)) ||
@@ -284,6 +288,7 @@ export class DartMixin implements DartDefBase {
   methods: Array<DartFunction>;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 
   constructor(params: Partial<DartMixin> & { name: string }) {
     this.name = params.name;
@@ -294,6 +299,7 @@ export class DartMixin implements DartDefBase {
     this.methods = params.methods ?? [];
     this.comment = params.comment ?? null;
     this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
   }
 }
 
@@ -308,6 +314,7 @@ export class DartExtension implements DartDefBase {
   methods: Array<DartFunction>;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 
   constructor(
     params: Partial<DartExtension> & { name: string | null; on: string }
@@ -319,6 +326,7 @@ export class DartExtension implements DartDefBase {
     this.methods = params.methods ?? [];
     this.comment = params.comment ?? null;
     this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
   }
 }
 
@@ -336,6 +344,7 @@ export class DartEnum implements DartDefBase {
   methods: Array<DartFunction>;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 
   constructor(
     params: Partial<DartEnum> & { name: string; entries: Array<DartEnumEntry> }
@@ -350,6 +359,7 @@ export class DartEnum implements DartDefBase {
     this.methods = params.methods ?? [];
     this.comment = params.comment ?? null;
     this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
   }
 
   get isSimpleEnum(): boolean {
@@ -384,6 +394,7 @@ export class DartTypeAlias implements DartDefBase {
   type: string;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 
   constructor(
     params: Partial<DartTypeAlias> & {
@@ -397,6 +408,7 @@ export class DartTypeAlias implements DartDefBase {
     this.type = params.type;
     this.comment = params.comment ?? null;
     this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
   }
 }
 
@@ -409,6 +421,7 @@ export interface DartConstructorData extends DartConstructorSpec {
   body: string | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 }
 
 export class DartConstructor implements DartConstructorData, DartDefBase {
@@ -423,6 +436,7 @@ export class DartConstructor implements DartConstructorData, DartDefBase {
   body: string | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 
   constructor(
     params: Partial<DartConstructorData> & {
@@ -440,6 +454,7 @@ export class DartConstructor implements DartConstructorData, DartDefBase {
     this.body = params.body ?? null;
     this.comment = params.comment ?? null;
     this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
   }
 }
 
@@ -513,6 +528,7 @@ export interface DartFieldData {
   defaultValue: string | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 }
 
 export class DartField implements DartFieldOrParam, DartDefBase {
@@ -528,6 +544,7 @@ export class DartField implements DartFieldOrParam, DartDefBase {
   dartClass: DartTypeScope | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 
   constructor(
     params: Partial<DartFieldData> & {
@@ -547,6 +564,7 @@ export class DartField implements DartFieldOrParam, DartDefBase {
     this.defaultValue = params.defaultValue ?? null;
     this.comment = params.comment ?? null;
     this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
   }
 }
 
@@ -581,6 +599,7 @@ export interface DartFunctionData {
   body: string | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 }
 
 export class DartFunction implements DartFunctionData, DartDefBase {
@@ -600,6 +619,7 @@ export class DartFunction implements DartFunctionData, DartDefBase {
   body: string | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
 
   constructor(
     params: Partial<DartFunctionData> & {
@@ -621,6 +641,7 @@ export class DartFunction implements DartFunctionData, DartDefBase {
     this.body = params.body ?? null;
     this.comment = params.comment ?? null;
     this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
   }
 }
 

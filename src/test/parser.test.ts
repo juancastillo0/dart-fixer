@@ -67,6 +67,9 @@ String? func2() {
 }
 ''';
 
+/* documentation multiline
+ other info
+*/
 class B extends Other {
   final int? v;
   final String value;
@@ -147,6 +150,11 @@ class B extends Other {
     assert.equal(values.imports[4].isRelative({ root: false }), true);
     assert.equal(values.imports[4].isFromPackage("dart_fixer_test"), false);
 
+    assert.equal(
+      values.classes[0].comment,
+      "/* documentation multiline\n other info\n*/"
+    );
+
     const defaultData = {
       hide: [],
       isExport: false,
@@ -187,6 +195,7 @@ class B extends Other {
         path: "package:dart_fixer_test/other.dart",
         isOwnPackage: true,
       },
+      // /// Comment
       // import '/other.dart' // other comment
       // as other   show Other ,showD;
       {
@@ -195,6 +204,7 @@ class B extends Other {
         path: "/other.dart",
         show: ["Other", "showD"],
         isOwnPackage: true,
+        comment: "/// Comment\n",
       },
       {
         ...defaultData,
@@ -426,10 +436,7 @@ class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __
 
     testClasses.forEach((c, i) => {
       test(c.name, () => {
-        assert.deepStrictEqual(
-          removeMatch([values.classes[i]], ["bracket"])[0],
-          c
-        );
+        assert.deepStrictEqual(removeMatch([values.classes[i]])[0], c);
       });
     });
   });
@@ -437,15 +444,17 @@ class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __
   suite("Dart Function", () => {
     // TODO: isExternal, isOperator
     const text = `
-final str = '''
+var str = '''
 String? func2() {
 }
 ''';
 
 class B extends Other {
   final int? v;
-  final String value;
+  /* documentation multiline single */ final String value;
 
+  /// Comment over annotation
+  @Annotation()
   B({
     this.v = 3,
     super.md = const [],
@@ -454,6 +463,9 @@ class B extends Other {
 
   bool get isVNull => v == null;
 
+  /// documentation
+  ///
+  /// single line joined
   int valueLength({bool? sum}) => value.length;
   Map<String , List<int? >> valueLengthReq(
     Object v, { required bool? sum}) =>{}
@@ -461,11 +473,16 @@ class B extends Other {
 
   set isVNull(bool newValue) {}
 
+  // single comment
   static compare<N extends num>(B self, [List<N>  def = const [2 ,]]) => self.isVNull;
 
   static int? compareInt([B? self]) => self?.v;
 }
 
+
+/*
+ // str2 info
+*/
 final str2 = '''
   String? func2() {
   }
@@ -473,6 +490,8 @@ final str2 = '''
 
 class G<T extends B?> {}
 
+@prefix.value
+/* Comment under annotation*/
 String func(G<B?> d) {
   return jsonDecode('{}');
 }   
@@ -482,20 +501,42 @@ String func(G<B?> d) {
     const classes = values.classes;
     const bClass = classes[0];
 
+    const defaultDataField = {
+      isStatic: false,
+      isFinal: false,
+      isVariable: false,
+      defaultValue: null,
+      dartClass: bClass,
+      comment: null,
+      annotations: [],
+    };
+    test("external fields", () => {
+      assert.deepStrictEqual(removeMatch(values.fields), [
+        {
+          ...defaultDataField,
+          dartClass: null,
+          isVariable: true,
+          name: "str",
+          type: null,
+          defaultValue: `'''\nString? func2() {\n}\n'''`,
+        },
+        {
+          ...defaultDataField,
+          dartClass: null,
+          isFinal: true,
+          name: "str2",
+          type: null,
+          comment: "/*\n // str2 info\n*/",
+          defaultValue: `'''\n  String? func2() {\n  }\n'''`,
+        },
+      ]);
+    });
+
     test("fields", () => {
       assert.strictEqual(bClass.name, "B");
       assert.strictEqual(bClass.extendsBound, "Other");
       assert.strictEqual(bClass.isAbstract, false);
 
-      const defaultDataField = {
-        isStatic: false,
-        isFinal: false,
-        isVariable: false,
-        defaultValue: null,
-        dartClass: bClass,
-        comment: null,
-        annotations: [],
-      };
       assert.deepStrictEqual(removeMatch(bClass.fields), [
         {
           ...defaultDataField,
@@ -508,6 +549,7 @@ String func(G<B?> d) {
           isFinal: true,
           name: "value",
           type: "String",
+          comment: "/* documentation multiline single */",
         },
       ]);
     });
@@ -535,9 +577,13 @@ String func(G<B?> d) {
         params: [],
         body: "=> v == null;",
       },
+      // /// documentation
+      // ///
+      // /// single line joined
       // int valueLength({bool? sum}) => value.length;
       {
         ...defaultData,
+        comment: "/// documentation\n///\n/// single line joined\n",
         returnType: "int",
         name: "valueLength",
         body: "=> value.length;",
@@ -600,6 +646,7 @@ String func(G<B?> d) {
           },
         ],
       },
+      // // single comment
       // static compare<N extends num>(B self, [List<N>  def = const [2 ,]]) => self.isVNull;
       {
         ...defaultData,
@@ -608,6 +655,7 @@ String func(G<B?> d) {
         name: "compare",
         generics: "<N extends num>",
         body: "=> self.isVNull;",
+        comment: "// single comment\n",
         params: [
           {
             isRequired: true,
@@ -655,6 +703,8 @@ String func(G<B?> d) {
 
     test(`function func`, () => {
       assert.deepStrictEqual(removeMatch(values.functions), [
+        // @prefix.value
+        // /* Comment under annotation*/
         // String func(G<B?> d) {
         //   return jsonDecode('{}');
         // }
@@ -663,6 +713,13 @@ String func(G<B?> d) {
           dartClass: null,
           returnType: "String",
           name: "func",
+          comment: "/* Comment under annotation*/",
+          annotations: [
+            {
+              qualifiedName: "prefix.value",
+              args: null,
+            },
+          ],
           body: `\
 {
   return jsonDecode('{}');
@@ -725,46 +782,43 @@ class B extends Other {
     const dartClass = values.classes[0];
 
     test("Class", () => {
-      assert.deepStrictEqual(
-        removeMatch(values.classes, ["bracket", "constructors"]),
-        [
-          {
-            isAbstract: false,
-            name: "B",
-            generics: null,
-            extendsBound: "Other",
-            fields: [
-              {
-                isStatic: false,
-                isFinal: true,
-                name: "v",
-                isVariable: false,
-                type: "int?",
-                defaultValue: null,
-                dartClass: values.classes[0],
-                comment: null,
-                annotations: [],
-              },
-              {
-                isStatic: false,
-                isFinal: true,
-                name: "value",
-                isVariable: false,
-                type: "String",
-                defaultValue: null,
-                dartClass: values.classes[0],
-                comment: null,
-                annotations: [],
-              },
-            ],
-            methods: [],
-            mixins: [],
-            interfaces: [],
-            comment: null,
-            annotations: [],
-          },
-        ]
-      );
+      assert.deepStrictEqual(removeMatch(values.classes, ["constructors"]), [
+        {
+          isAbstract: false,
+          name: "B",
+          generics: null,
+          extendsBound: "Other",
+          fields: [
+            {
+              isStatic: false,
+              isFinal: true,
+              name: "v",
+              isVariable: false,
+              type: "int?",
+              defaultValue: null,
+              dartClass: values.classes[0],
+              comment: null,
+              annotations: [],
+            },
+            {
+              isStatic: false,
+              isFinal: true,
+              name: "value",
+              isVariable: false,
+              type: "String",
+              defaultValue: null,
+              dartClass: values.classes[0],
+              comment: null,
+              annotations: [],
+            },
+          ],
+          methods: [],
+          mixins: [],
+          interfaces: [],
+          comment: null,
+          annotations: [],
+        },
+      ]);
     });
 
     const defaultConstructor = {
@@ -845,6 +899,7 @@ class B extends Other {
           ...defaultConstructor,
           isConst: true,
           name: "named",
+          comment: "/// comm\n",
           params: [
             {
               ...defaultConstructorParam,
@@ -1089,6 +1144,8 @@ function removeMatch(
     const obj: Record<string, unknown> = { ...v };
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete obj["match"];
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+    delete obj["bracket"];
     for (const key of keysToRemove) {
       // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete obj[key];

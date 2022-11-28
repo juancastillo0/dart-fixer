@@ -120,6 +120,27 @@ grammar Dart;
 }
 
 @lexer::members{
+public static readonly COMMENT_MULTI_LINE = "multiline";
+public static readonly COMMENT_SINGLE_LINE = "singleline";
+
+comments: Array<{
+  kind: "multiline" | "singleline",
+  text: string,
+  line: number,
+  index: number,
+  column: number,
+}> = [];
+
+private enterComment(kind: "singleline" | "multiline") {
+  this.comments.push({
+    kind,
+    text: this.text,
+    line: this.line,
+    index: this.charIndex,
+    column: this.charPositionInLine,
+  });
+}
+
 public static readonly BRACE_NORMAL: number = 1;
 public static readonly BRACE_SINGLE: number = 2;
 public static readonly BRACE_DOUBLE: number = 3;
@@ -1944,12 +1965,12 @@ IDENTIFIER
 
 SINGLE_LINE_COMMENT
     :    '//' (~('\r' | '\n'))* NEWLINE?
-         { this.skip(); }
+         { this.enterComment(DartLexer.COMMENT_SINGLE_LINE); this.skip(); }
     ;
 
 MULTI_LINE_COMMENT
     :    '/*' (MULTI_LINE_COMMENT | .)*? '*/'
-         { this.skip(); }
+         { this.enterComment(DartLexer.COMMENT_MULTI_LINE); this.skip(); }
     ;
 
 fragment

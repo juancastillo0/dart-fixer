@@ -258,6 +258,27 @@ export class DartLexer extends Lexer {
 	// tslint:enable:no-trailing-whitespace
 
 
+	public static readonly COMMENT_MULTI_LINE = "multiline";
+	public static readonly COMMENT_SINGLE_LINE = "singleline";
+
+	comments: Array<{
+	  kind: "multiline" | "singleline",
+	  text: string,
+	  line: number,
+	  index: number,
+	  column: number,
+	}> = [];
+
+	private enterComment(kind: "singleline" | "multiline") {
+	  this.comments.push({
+	    kind,
+	    text: this.text,
+	    line: this.line,
+	    index: this.charIndex,
+	    column: this.charPositionInLine,
+	  });
+	}
+
 	public static readonly BRACE_NORMAL: number = 1;
 	public static readonly BRACE_SINGLE: number = 2;
 	public static readonly BRACE_DOUBLE: number = 3;
@@ -521,14 +542,14 @@ export class DartLexer extends Lexer {
 	private SINGLE_LINE_COMMENT_action(_localctx: RuleContext, actionIndex: number): void {
 		switch (actionIndex) {
 		case 18:
-			 this.skip(); 
+			 this.enterComment(DartLexer.COMMENT_SINGLE_LINE); this.skip(); 
 			break;
 		}
 	}
 	private MULTI_LINE_COMMENT_action(_localctx: RuleContext, actionIndex: number): void {
 		switch (actionIndex) {
 		case 19:
-			 this.skip(); 
+			 this.enterComment(DartLexer.COMMENT_MULTI_LINE); this.skip(); 
 			break;
 		}
 	}

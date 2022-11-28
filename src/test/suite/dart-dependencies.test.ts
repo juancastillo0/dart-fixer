@@ -1,6 +1,6 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
-import { mapContextToDartImport, parseLibrary } from "../../antlr/antlr-parser";
+import { mapContextToDartImport, ParseCtx } from "../../antlr/antlr-parser";
 import { getRootDir, resolveUri } from "../../dart-dependencies";
 
 suite("Dart Dependencies", () => {
@@ -56,7 +56,7 @@ suite("Dart Dependencies", () => {
   });
 
   test("resolveUri", () => {
-    const lib = parseLibrary(`
+    const lib = new ParseCtx(`
 import './f1.dart';
 import "../nested/f2.dart";
 import "/nested/f3.dart";
