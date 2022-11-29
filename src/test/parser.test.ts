@@ -1,6 +1,14 @@
 import * as assert from "assert";
 import { parseClassesAntlr } from "../antlr/antlr-parser";
-import { DartEnum, DartMixin, DartType } from "../parser";
+import {
+  DartConstructor,
+  DartEnum,
+  DartExtension,
+  DartField,
+  DartFunction,
+  DartMixin,
+  DartType,
+} from "../parser";
 import { Bracket, getBrackets } from "../parser-utils";
 
 suite("Parser Test Suite", () => {
@@ -437,6 +445,320 @@ class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __
     testClasses.forEach((c, i) => {
       test(c.name, () => {
         assert.deepStrictEqual(removeMatch([values.classes[i]])[0], c);
+      });
+    });
+  });
+
+  suite("Dart Mixins and Extensions", () => {
+    const text = `
+mixin PM {}
+
+extension Ext on PM {}
+
+mixin PMM on PM {}
+
+class Another with PM, PMM {}
+
+abstract class BaseI {}
+
+class BaseC<T> {}
+
+extension ExtGeneric<V> on BaseC<V> {}
+
+class C extends BaseC<int> with PM implements BaseI {}
+
+mixin PMO<P extends Another, K extends BaseC<String?>> on Another {}
+
+class D = Another with PMO<Another, BaseC<String?>>;
+`;
+
+    const values = parseClassesAntlr(text);
+    const defaultMixin = new DartMixin({
+      name: "",
+    });
+    const mixins: Array<Partial<DartMixin>> = [
+      { ...defaultMixin, name: "PM" },
+      { ...defaultMixin, name: "PMM", on: ["PM"] },
+      {
+        ...defaultMixin,
+        name: "PMO",
+        on: ["Another"],
+        generics: "<P extends Another, K extends BaseC<String?>>",
+      },
+    ];
+
+    mixins.forEach((iterator, i) => {
+      test(`mixin ${iterator.name!}`, () => {
+        assert.deepStrictEqual(
+          removeMatch([values.mixins[i]])[0],
+          removeMatch([iterator])[0]
+        );
+      });
+    });
+
+    const defaultExtension = new DartExtension({
+      name: null,
+      on: "",
+    });
+    const extensions: Array<Partial<DartExtension>> = [
+      { ...defaultExtension, name: "Ext", on: "PM" },
+      {
+        ...defaultExtension,
+        name: "ExtGeneric",
+        on: "BaseC<V>",
+        generics: "<V>",
+      },
+    ];
+
+    extensions.forEach((iterator, i) => {
+      test(`extension ${iterator.name!}`, () => {
+        assert.deepStrictEqual(
+          removeMatch([values.extensions[i]])[0],
+          removeMatch([iterator])[0]
+        );
+      });
+    });
+  });
+
+  suite("Dart Enums", () => {
+    const text = `\
+/// enum E comment
+enum E {
+  variant1,
+  variant2
+}
+
+class BaseClass {}
+
+enum OtherFields implements BaseClass {
+  md(
+    "List",
+    isFinal: true,
+    defaultValue: null,
+  ),
+  pos(
+    "String?",
+    isFinal: false,
+    defaultValue: "default",
+  );
+
+  final String type;
+  final bool isFinal;
+  final Object? defaultValue;
+
+  bool get isNullable => type.endsWith('?');
+
+  Object? get(Other object) {
+    switch (this) {
+      case OtherFields.md:
+        return object.md;
+      case OtherFields.pos:
+        return object.pos;
+    }
+  }
+
+  const OtherFields(
+    this.type, {
+    required this.isFinal,
+    this.defaultValue,
+  });
+}
+`;
+    const values = parseClassesAntlr(text);
+
+    const defaultEnum = new DartEnum({
+      name: "",
+      entries: [],
+    });
+    const enums: Array<Partial<DartEnum>> = [
+      {
+        ...defaultEnum,
+        name: "E",
+        comment: "/// enum E comment\n",
+        entries: [
+          {
+            arguments: [],
+            generics: null,
+            name: "variant1",
+          },
+          {
+            arguments: [],
+            generics: null,
+            name: "variant2",
+          },
+        ],
+      },
+      // TODO: test generics
+      {
+        ...defaultEnum,
+        name: "OtherFields",
+        interfaces: ["BaseClass"],
+
+        constructors: [
+          new DartConstructor({
+            dartClass: values.enums[1],
+            isConst: true,
+            isFactory: false,
+            name: null,
+            params: [
+              {
+                dartConstructor: values.enums[1].constructors[0],
+                defaultValue: null,
+                isNamed: false,
+                isRequired: true,
+                isSuper: false,
+                isThis: true,
+                name: "type",
+                type: "String",
+              },
+              {
+                dartConstructor: values.enums[1].constructors[0],
+                defaultValue: null,
+                isNamed: true,
+                isRequired: true,
+                isSuper: false,
+                isThis: true,
+                name: "isFinal",
+                type: "bool",
+              },
+              {
+                dartConstructor: values.enums[1].constructors[0],
+                defaultValue: null,
+                isNamed: true,
+                isRequired: false,
+                isSuper: false,
+                isThis: true,
+                name: "defaultValue",
+                type: "Object?",
+              },
+            ],
+          }),
+        ],
+        methods: [
+          // bool get isNullable => type.endsWith('?');
+
+          // Object? get(Other object) {
+          //   switch (this) {
+          //     case OtherFields.md:
+          //       return object.md;
+          //     case OtherFields.pos:
+          //       return object.pos;
+          //   }
+          // }
+          new DartFunction(
+            {
+              name: "isNullable",
+              returnType: "bool",
+              body: "=> type.endsWith('?');",
+              isGetter: true,
+            },
+            values.enums[1]
+          ),
+          new DartFunction(
+            {
+              name: "get",
+              returnType: "Object?",
+              params: [
+                {
+                  defaultValue: null,
+                  isNamed: false,
+                  isRequired: true,
+                  name: "object",
+                  type: "Other",
+                  dartFunction: values.enums[1].methods[1],
+                },
+              ],
+              body: `{
+    switch (this) {
+      case OtherFields.md:
+        return object.md;
+      case OtherFields.pos:
+        return object.pos;
+    }
+  }`,
+            },
+            values.enums[1]
+          ),
+        ],
+        fields: [
+          // final String type;
+          // final bool isFinal;
+          // final Object? defaultValue;
+          new DartField(
+            {
+              isFinal: true,
+              isVariable: false,
+              name: "type",
+              type: "String",
+            },
+            values.enums[1]
+          ),
+          new DartField(
+            {
+              isFinal: true,
+              isVariable: false,
+              name: "isFinal",
+              type: "bool",
+            },
+            values.enums[1]
+          ),
+          new DartField(
+            {
+              isFinal: true,
+              isVariable: false,
+              name: "defaultValue",
+              type: "Object?",
+            },
+            values.enums[1]
+          ),
+        ],
+        entries: [
+          {
+            generics: null,
+            name: "md",
+            arguments: [
+              {
+                name: null,
+                value: `"List"`,
+              },
+              {
+                name: "isFinal",
+                value: `true`,
+              },
+              {
+                name: "defaultValue",
+                value: `null`,
+              },
+            ],
+          },
+          {
+            generics: null,
+            name: "pos",
+            arguments: [
+              {
+                name: null,
+                value: `"String?"`,
+              },
+              {
+                name: "isFinal",
+                value: `false`,
+              },
+              {
+                name: "defaultValue",
+                value: `"default"`,
+              },
+            ],
+          },
+        ],
+      },
+    ];
+
+    enums.forEach((iterator, i) => {
+      test(`enum ${iterator.name!}`, () => {
+        assert.deepStrictEqual(
+          removeMatch([values.enums[i]])[0],
+          removeMatch([iterator])[0]
+        );
       });
     });
   });

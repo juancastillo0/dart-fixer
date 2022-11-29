@@ -293,7 +293,7 @@ export const parseClassesAntlr = (
                   ?.argumentList()
                   ?.argument()
                   ?.map((a) => ({
-                    name: a.label()?.text ?? null,
+                    name: a.label()?.text?.replace(":", "") ?? null,
                     value: getIntervalText(a.expression()),
                   })) ?? [],
             })),
