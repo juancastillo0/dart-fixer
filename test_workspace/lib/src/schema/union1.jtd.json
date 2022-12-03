@@ -1,0 +1,20 @@
+{
+  "discriminator": "runtimeType",
+  "mapping": {
+    "One": {
+      "properties": {
+        "id": { "type": "string" },
+        "maps": { "values": { "type": "boolean", "nullable": true } }
+      }
+    },
+    "Two": {
+      "properties": {
+        "isAdmin": { "type": "boolean", "nullable": true }
+      },
+      "optionalProperties": {
+        "op": { "type": "string" },
+        "list": { "elements": { "type": "string" }, "nullable": true }
+      }
+    }
+  }
+}

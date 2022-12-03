@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "type": "object",
+  "properties": {
+    "de": {
+      "type": "number"
+    },
+    "enNum": {
+      "enum": [1, 2, 3]
+    },
+    "en": {
+      "enum": ["1", "2", "3"]
+    }
+  },
+  "definitions": {
+    "other": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "friends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/other"
+          }
+        }
+      }
+    }
+  }
+}

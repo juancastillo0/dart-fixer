@@ -1,0 +1,7 @@
+{
+  "name": "dwd",
+  "value": 2,
+  "list": ["", "other"],
+  "listAny": [4, "other", null],
+  "m": {}
+}
