@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import {
   //   TODO: createOutOfDateDiagnostic,
   GeneratedSection,
@@ -8,6 +7,7 @@ import { parseClassesAntlr } from "./antlr/antlr-parser";
 import {
   getDartPackageData,
   getRootDir,
+  Path,
   PubSpecData,
   PubSpecParsed,
   resolveUri,
@@ -15,6 +15,43 @@ import {
 } from "./dart-dependencies";
 import { DartImports, DartType, DartTypeAlias, DartTypeDef } from "./parser";
 import { GenerationOptions } from "./printer";
+import * as path from "path";
+import * as minimatch from "minimatch";
+
+// https://stackoverflow.com/questions/69333492/vscode-create-a-document-in-memory-with-uri-for-automated-testing
+export abstract class FileSystemManager {
+  abstract openTextDocument(path: string): Promise<TextDocument>;
+  abstract findFiles(glob: string): Promise<Array<string>>;
+
+  static fromMap(values: Map<string, TextDocument>): FileSystemManager {
+    return new FileSystemMockImpl(values);
+  }
+}
+
+class FileSystemMockImpl implements FileSystemManager {
+  constructor(public values: Map<string, TextDocument>) {}
+
+  openTextDocument(path: string): Promise<TextDocument> {
+    let value = this.values.get(path);
+    if (!value) {
+      value = { getText: () => "", uri: path, version: 0 };
+      this.values.set(path, value);
+    }
+    return Promise.resolve(value);
+  }
+
+  findFiles(glob: string): Promise<Array<string>> {
+    return Promise.resolve(
+      [...this.values.keys()].filter((v) => minimatch(glob, v))
+    );
+  }
+}
+
+export interface TextDocument {
+  getText: () => string;
+  uri: string;
+  version: number;
+}
 
 export interface ParsedDartFile {
   version: number;
@@ -30,12 +67,17 @@ export interface ParsedDartFileData {
 }
 
 export class DartAnalyzer {
-  constructor(globalConfig: GenerationOptions | undefined) {
+  constructor(
+    globalConfig: GenerationOptions | undefined,
+    opts: { fsControl: FileSystemManager }
+  ) {
     this.updateConfig(globalConfig);
+    this.fsControl = opts.fsControl;
   }
 
+  fsControl: FileSystemManager;
   globalConfig: GenerationOptions | undefined;
-  pubSpecDataMap: Map<vscode.Uri, PubSpecData> | undefined;
+  pubSpecDataMap: Map<Path, PubSpecData> | undefined;
   // TODO: remove deleted files
   cache = new Map<string, ParsedDartFile>();
 
@@ -53,7 +95,7 @@ export class DartAnalyzer {
     }
     // TODO: typeDefinitions key may not be normalized
     const data = fileData.data;
-    const fileUri = vscode.Uri.parse(params.file);
+    const fileUri = params.file;
     const rootDir = getRootDir({
       pubSpecUri: data.pubSpecInfo?.uri,
       uri: fileUri,
@@ -105,10 +147,10 @@ export class DartAnalyzer {
 
   private findDefinitionOnImport(
     dartType: DartType,
-    arg0: ResolveUriParams,
+    params: ResolveUriParams,
     processedFiles: Set<string>
   ): DartTypeDef | undefined {
-    const uri = resolveUri(arg0);
+    const uri = resolveUri(params);
     if (!uri || processedFiles.has(uri.toString())) {
       return undefined;
     }
@@ -130,8 +172,8 @@ export class DartAnalyzer {
           dartType,
           {
             fileUri: uri,
-            packageName: arg0.packageName,
-            rootDir: arg0.rootDir,
+            packageName: params.packageName,
+            rootDir: params.rootDir,
             importItem: exportItem,
           },
           processedFiles
@@ -145,13 +187,13 @@ export class DartAnalyzer {
   }
 
   getData = async (
-    document: { getText: () => string; uri: vscode.Uri; version: number } // vscode.TextDocument
+    document: TextDocument // vscode.TextDocument
   ): Promise<
     | { data: ParsedDartFileData; didChange: boolean; error?: undefined }
     | { error: object }
   > => {
     if (!this.pubSpecDataMap) {
-      this.pubSpecDataMap = await getDartPackageData();
+      this.pubSpecDataMap = await getDartPackageData(this.fsControl);
       // TODO:
       // if (token.isCancellationRequested) {
       //   return [];
@@ -159,7 +201,7 @@ export class DartAnalyzer {
     }
     let pubSpecDataE: PubSpecParsed | undefined;
     for (const [k, v] of this.pubSpecDataMap.entries()) {
-      const dir = vscode.Uri.joinPath(k, "..");
+      const dir = path.join(k, "..");
       if (
         document.uri.toString().startsWith(dir.toString()) &&
         (!pubSpecDataE ||
@@ -198,7 +240,7 @@ export class DartAnalyzer {
           console.log("uri ", uri);
           try {
             // TODO:
-            const importDoc = await vscode.workspace.openTextDocument(uri);
+            const importDoc = await this.fsControl.openTextDocument(uri);
             await this.getData(importDoc);
           } catch (error) {
             console.error(error);

@@ -2,7 +2,8 @@ import { DartImport } from "./parser";
 import { GenerationOptions } from "./printer";
 import * as fs from "fs";
 import * as yaml from "yaml";
-import * as vscode from "vscode";
+import { FileSystemManager } from "./analyzer";
+import * as path from "path";
 
 export type PubSpecDependency = Record<
   string,
@@ -11,7 +12,7 @@ export type PubSpecDependency = Record<
 
 export interface PubSpecParsed {
   data: PubSpecData;
-  uri: vscode.Uri;
+  uri: Path;
 }
 
 export interface PubSpecData {
@@ -29,15 +30,17 @@ export interface PubSpecData {
   dart_fixer?: GenerationOptions;
 }
 
-export const getDartPackageData = async (): Promise<
-  Map<vscode.Uri, PubSpecData>
-> => {
-  const result = new Map<vscode.Uri, PubSpecData>();
-  const pubspecs = await vscode.workspace.findFiles("pubspec.yaml");
+export type Path = string;
+
+export const getDartPackageData = async (
+  fsControl: FileSystemManager
+): Promise<Map<Path, PubSpecData>> => {
+  const result = new Map<Path, PubSpecData>();
+  const pubspecs = await fsControl.findFiles("pubspec.yaml");
   for (const pubspec of pubspecs) {
     try {
-      const content = fs.readFileSync(pubspec.fsPath, "utf8");
-      const data = yaml.parse(content) as PubSpecData;
+      const content = await fsControl.openTextDocument(pubspec);
+      const data = yaml.parse(content.getText()) as PubSpecData;
       result.set(pubspec, data);
     } catch (error) {
       console.error("Error parsing pubspec.yaml", error);
@@ -47,31 +50,33 @@ export const getDartPackageData = async (): Promise<
 };
 
 export const getRootDir = (params: {
-  uri: vscode.Uri;
-  pubSpecUri: vscode.Uri | undefined;
-}): vscode.Uri | undefined => {
+  uri: Path;
+  pubSpecUri: Path | undefined;
+}): Path | undefined => {
   const dir = params?.pubSpecUri
-    ? vscode.Uri.joinPath(params.pubSpecUri, "..")
-    : ((): vscode.Uri | undefined => {
+    ? path.join(params.pubSpecUri, "..")
+    : ((): Path | undefined => {
         let current = params.uri;
-        while (
-          ["/src", "/lib", "/bin"].every((p) => !current.path.endsWith(p))
-        ) {
-          current = vscode.Uri.joinPath(current, "..");
-          if (["", "/", "\\"].includes(current.path)) {
+        // TODO: fix tests
+        if (!current.match(/^[\\./]/)) {
+          current = `/${current}`;
+        }
+        while (["/src", "/lib", "/bin"].every((p) => !current.endsWith(p))) {
+          current = path.join(current, "..");
+          if (["", "/", "\\"].includes(current)) {
             return undefined;
           }
         }
-        return vscode.Uri.joinPath(current, "..");
+        return path.join(current, "..");
       })();
 
   return dir;
 };
 
 export interface ResolveUriParams {
-  fileUri: vscode.Uri;
+  fileUri: Path;
   packageName: string | undefined;
-  rootDir: vscode.Uri | undefined;
+  rootDir: Path | undefined;
   importItem: DartImport;
 }
 
@@ -80,15 +85,16 @@ export const resolveUri = ({
   packageName,
   rootDir,
   importItem,
-}: ResolveUriParams): vscode.Uri | undefined => {
-  let uri: vscode.Uri | undefined;
+}: ResolveUriParams): Path | undefined => {
+  let uri: Path | undefined;
   if (importItem.path.startsWith(".")) {
-    uri = vscode.Uri.joinPath(fileUri, "..", importItem.path);
+    uri = path.join(fileUri, "..", importItem.path);
   } else if (rootDir) {
     const p = importItem.path.replace(`package:${packageName ?? ""}`, "");
-    uri = vscode.Uri.joinPath(rootDir, p);
-    if (!fs.existsSync(uri.fsPath)) {
-      uri = vscode.Uri.joinPath(rootDir, "lib", p);
+    uri = path.join(rootDir, p);
+    // TODO: replace fs with mock
+    if (!fs.existsSync(uri)) {
+      uri = path.join(rootDir, "lib", p);
     }
   }
   return uri;

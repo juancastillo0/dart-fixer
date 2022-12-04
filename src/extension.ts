@@ -2,13 +2,18 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { DartAnalyzer } from "./analyzer";
-import { createOutOfDateDiagnostic, GeneratedSection } from "./generator-utils";
+import { GeneratedSection, JsonFileKind } from "./generator-utils";
 import {
   executeJsonToDartCommand,
-  JsonFileKind,
   JsonTypeDefinitionDartCodeActionProvider,
 } from "./json-type-definition/vscode-json-edit";
 import { generate, GenerationOptions } from "./printer";
+import {
+  createOutOfDateDiagnostic,
+  pathFromUri,
+  textDocumentFromVsCode,
+  VsCodeFileSystem,
+} from "./vscode-utils";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
@@ -38,7 +43,9 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.languages.createDiagnosticCollection("dart-fixer");
   context.subscriptions.push(fixerDiagnostics);
 
-  const analyzer = new DartAnalyzer(getExtensionConfig());
+  const analyzer = new DartAnalyzer(getExtensionConfig(), {
+    fsControl: new VsCodeFileSystem(),
+  });
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(() =>
       analyzer.updateConfig(getExtensionConfig())
@@ -128,7 +135,9 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
     _: vscode.CodeActionContext,
     token: vscode.CancellationToken
   ): Promise<Array<vscode.CodeAction>> {
-    const result = await this.analyzer.getData(document);
+    const result = await this.analyzer.getData(
+      textDocumentFromVsCode(document)
+    );
     if (token.isCancellationRequested || result.error) {
       return [];
     }
@@ -169,7 +178,7 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
       );
       const { content, md5Hash } = generate(dartClass, data.config ?? {}, {
         analyzer: this.analyzer,
-        outputFile: document.uri.toString(),
+        outputFile: pathFromUri(document.uri),
       });
       let rangeToEdit = new vscode.Range(
         originalEnd.line,
