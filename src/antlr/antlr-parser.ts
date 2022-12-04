@@ -1004,7 +1004,7 @@ function setClassMemberLists(
           const body = ctx.getIntervalText(context.redirectionOrInitializers);
           const dartConstructor = new DartConstructor({
             ...data,
-            dartClass,
+            dartType: dartClass,
             // TODO: verify `;`
             body: body ? `${body};` : null,
             isConst:
@@ -1050,7 +1050,7 @@ function setClassMemberLists(
       );
 
       const dartConstructor = new DartConstructor({
-        dartClass,
+        dartType: dartClass,
         isConst: false,
         name: null,
         isFactory: false,

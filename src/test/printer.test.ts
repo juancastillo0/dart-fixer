@@ -106,7 +106,7 @@ Model copyWith({
 }
 
 @override
-bool operator ==(Object? other) {
+bool operator ==(Object other) {
   return identical(other, this) || other is Model && other.runtimeType == runtimeType
    && other.v == v && other.value == value && other.params == params;
 }
@@ -261,8 +261,9 @@ class O {
     assert.equal(
       content,
       `
+
 O({required this.a,this.b,required this.d,required this.c,required this.e,this.f,});
-// generated-dart-fixer-start{"md5Hash":"gagS+2Qp5HLYgTyBcyKb2w=="}
+// generated-dart-fixer-start{"md5Hash":"ZbPjUGj+ojwy5CEX/TDPDg=="}
   
 factory O.fromJson(Map json) {
   return O(
@@ -305,7 +306,7 @@ O copyWith({
 }
 
 @override
-bool operator ==(Object? other) {
+bool operator ==(Object other) {
   return identical(other, this) || other is O && other.runtimeType == runtimeType
    && other.a == a && other.b == b && other.d == d && other.c == c && other.e == e && other.f == f;
 }
@@ -475,7 +476,7 @@ class OBuilder {
   OBuilder copyWith(OBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"gagS+2Qp5HLYgTyBcyKb2w=="}
+// generated-dart-fixer-end{"md5Hash":"ZbPjUGj+ojwy5CEX/TDPDg=="}
 `
     );
   });

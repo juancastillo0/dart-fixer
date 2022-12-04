@@ -208,7 +208,7 @@ export class DartImport implements DartImportData, DartDefBase {
 
 export interface DartConstructorSpec {
   name: string | null;
-  dartClass: DartClass | DartEnum;
+  dartType: DartClass | DartEnum;
   params: Array<DartConstructorParam>;
 }
 
@@ -417,7 +417,7 @@ export interface DartConstructorData extends DartConstructorSpec {
   isFactory: boolean;
   name: string | null;
   params: Array<DartConstructorParam>;
-  dartClass: DartClass | DartEnum;
+  dartType: DartClass | DartEnum;
   body: string | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
@@ -432,7 +432,7 @@ export class DartConstructor implements DartConstructorData, DartDefBase {
   isFactory: boolean;
   name: string | null;
   params: Array<DartConstructorParam>;
-  dartClass: DartClass | DartEnum;
+  dartType: DartClass | DartEnum;
   body: string | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
@@ -443,10 +443,10 @@ export class DartConstructor implements DartConstructorData, DartDefBase {
       name: string | null;
       isConst: boolean;
       isFactory: boolean;
-      dartClass: DartClass | DartEnum;
+      dartType: DartClass | DartEnum;
     }
   ) {
-    this.dartClass = params.dartClass;
+    this.dartType = params.dartType;
     this.isConst = params.isConst;
     this.isFactory = params.isFactory;
     this.name = params.name;
@@ -513,7 +513,7 @@ export class DartConstructorParam implements DartConstructorParamData {
     if (!this.type && (this.isThis || this.isSuper)) {
       // TODO: what about super class fields?
       this.type =
-        dartConstructor.dartClass.fields.find((v) => v.name === this.name)
+        dartConstructor.dartType.fields.find((v) => v.name === this.name)
           ?.type ?? null;
     }
   }
@@ -541,7 +541,7 @@ export class DartField implements DartFieldOrParam, DartDefBase {
   isVariable: boolean;
   type: string | null;
   defaultValue: string | null;
-  dartClass: DartTypeScope | null;
+  parentType: DartTypeScope | null;
   comment: string | null;
   annotations: Array<DartMetadata>;
   bracket: BracketWithOriginal | null;
@@ -553,9 +553,9 @@ export class DartField implements DartFieldOrParam, DartDefBase {
       isVariable: boolean;
       type: string | null;
     },
-    dartClass: DartTypeScope | null
+    parentType: DartTypeScope | null
   ) {
-    this.dartClass = dartClass;
+    this.parentType = parentType;
     this.isStatic = params.isStatic ?? false;
     this.isFinal = params.isFinal;
     this.name = params.name;
@@ -614,7 +614,7 @@ export class DartFunction implements DartFunctionData, DartDefBase {
   name: string;
   returnType: string | null;
   params: Array<DartFunctionParam>;
-  dartClass: DartTypeScope | null;
+  parentType: DartTypeScope | null;
   generics: string | null;
   body: string | null;
   comment: string | null;
@@ -626,9 +626,9 @@ export class DartFunction implements DartFunctionData, DartDefBase {
       name: string;
       returnType: string | null;
     },
-    dartClass: DartTypeScope | null
+    parentType: DartTypeScope | null
   ) {
-    this.dartClass = dartClass;
+    this.parentType = parentType;
     this.isStatic = params.isStatic ?? false;
     this.isExternal = params.isExternal ?? false;
     this.isGetter = params.isGetter ?? false;

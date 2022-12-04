@@ -228,6 +228,23 @@ ${
     },
     unionBaseClass
   );
+  if (maybe) {
+    func.params.push(
+      new DartFunctionParam(
+        {
+          defaultValue: null,
+          isNamed: true,
+          isRequired: true,
+          name: "orElse",
+          type: `T Function(${unionBaseClass.name} ${recase(
+            unionBaseClass.name,
+            "camelCase"
+          )})`,
+        },
+        func
+      )
+    );
+  }
   func.params.push(
     ...variants.map(
       ({ name, variant }) =>
@@ -246,23 +263,6 @@ ${
         )
     )
   );
-  if (maybe) {
-    func.params.push(
-      new DartFunctionParam(
-        {
-          defaultValue: null,
-          isNamed: true,
-          isRequired: true,
-          name: "orElse",
-          type: `T Function(${unionBaseClass.name} ${recase(
-            unionBaseClass.name,
-            "camelCase"
-          )})`,
-        },
-        func
-      )
-    );
-  }
   return func;
 };
 
@@ -292,7 +292,7 @@ export function createUnionClass(
   });
   unionBaseClass.constructors.push(
     new DartConstructor({
-      dartClass: unionBaseClass,
+      dartType: unionBaseClass,
       isConst: true,
       isFactory: false,
       name: null,
@@ -308,7 +308,7 @@ export function createUnionClass(
       const defaultConstructor =
         variant.defaultConstructor ?? makeConstructorFromFields(variant);
       const variantFactory = new DartConstructor({
-        dartClass: unionBaseClass,
+        dartType: unionBaseClass,
         isConst: defaultConstructor.isConst,
         isFactory: true,
         name: recase(toDartIdentifier(name), "camelCase"),
@@ -340,7 +340,7 @@ export function createUnionClass(
   const stateError = `throw StateError("Unknown variant for union ${unionBaseClass.name} \${json}");`;
 
   const fromJsonFactory = new DartConstructor({
-    dartClass: unionBaseClass,
+    dartType: unionBaseClass,
     isConst: false,
     isFactory: true,
     name: "fromJson",

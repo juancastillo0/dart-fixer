@@ -91,7 +91,7 @@ ${dartExtension.methods.map(this.printFunction).join("\n  ")}
     return `\
 ${dartConstructor.isConst ? "const " : ""}\
 ${dartConstructor.isFactory ? "factory " : ""}\
-${dartConstructor.dartClass.name}${
+${dartConstructor.dartType.name}${
       dartConstructor.name ? "." + dartConstructor.name : ""
     }(${this.printParams(dartConstructor.params)})${
       dartConstructor.body ?? ";"
@@ -121,7 +121,7 @@ ${dartFunction.body ?? ";"}`;
   };
 
   getParamOrder = (p: DartConstructorParam | DartFunctionParam): number =>
-    (p.isRequired ? 0 : 1) + (p.isNamed ? 2 : 0);
+    p.isNamed ? 2 : p.isRequired ? 0 : 1;
 
   printParams = (
     params: Array<DartConstructorParam | DartFunctionParam>

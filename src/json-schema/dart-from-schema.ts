@@ -373,7 +373,7 @@ const mapDartEnumFromJsonSchema = (
   const isNumber = enumTypes.size === 1 && enumTypes.has("number");
 
   const constructor = new DartConstructor({
-    dartClass: dartEnum,
+    dartType: dartEnum,
     isConst: true,
     isFactory: false,
     name: null,
@@ -414,7 +414,7 @@ const mapDartEnumFromJsonSchema = (
   );
 
   const fromJsonConstructor = new DartConstructor({
-    dartClass: dartEnum,
+    dartType: dartEnum,
     isConst: false,
     isFactory: true,
     name: "fromJson",

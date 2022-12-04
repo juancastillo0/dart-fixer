@@ -120,7 +120,7 @@ export const makeConstructorFromFields = (
     isFactory: false,
     name: opts?.name ?? null,
     params: [],
-    dartClass,
+    dartType: dartClass,
     body: opts?.body ?? null,
   });
   classConstructor.params.push(
@@ -150,7 +150,7 @@ export const generateFromJson = (
   params?: GenerateAnalyzerParams
 ): string => {
   return `
-factory ${dartConstructor.dartClass.name}.fromJson(Map json) {
+factory ${dartConstructor.dartType.name}.fromJson(Map json) {
   return ${instantiateConstructor(
     dartConstructor,
     dartConstructor.params.map((p) => ({
@@ -320,7 +320,7 @@ const instantiateConstructor = (
   const delimiter = options?.delimiter ?? "  ";
 
   return `\
-${dartConstructor.dartClass.name}${constructorName}(
+${dartConstructor.dartType.name}${constructorName}(
   ${delimiter}${dartConstructor.params
     .filter((p) => fieldsMap.has(p.name))
     .map((p) => {
@@ -367,7 +367,7 @@ ${dartClass.name} copyWith({
 }
 
 @override
-bool operator ==(Object${question} other) {
+bool operator ==(Object other) {
   return identical(other, this) || other is ${
     dartClass.name
   } && other.runtimeType == runtimeType

@@ -428,7 +428,7 @@ class $N_ame5 extends Name4< Name3 <Name2>>{ const $N_ame5();} abstract class __
             isFactory: false,
             name: null,
             params: [],
-            dartClass: values.classes[4],
+            dartType: values.classes[4],
             body: null,
             comment: null,
             annotations: [],
@@ -596,7 +596,7 @@ enum OtherFields implements BaseClass {
 
         constructors: [
           new DartConstructor({
-            dartClass: values.enums[1],
+            dartType: values.enums[1],
             isConst: true,
             isFactory: false,
             name: null,
@@ -659,14 +659,16 @@ enum OtherFields implements BaseClass {
               name: "get",
               returnType: "Object?",
               params: [
-                {
-                  defaultValue: null,
-                  isNamed: false,
-                  isRequired: true,
-                  name: "object",
-                  type: "Other",
-                  dartFunction: values.enums[1].methods[1],
-                },
+                new DartFunctionParam(
+                  {
+                    defaultValue: null,
+                    isNamed: false,
+                    isRequired: true,
+                    name: "object",
+                    type: "Other",
+                  },
+                  values.enums[1].methods[1]
+                ),
               ],
               body: `{
     switch (this) {
@@ -828,7 +830,7 @@ String func(G<B?> d) {
       isFinal: false,
       isVariable: false,
       defaultValue: null,
-      dartClass: bClass,
+      parentType: bClass,
       comment: null,
       annotations: [],
     };
@@ -836,7 +838,7 @@ String func(G<B?> d) {
       assert.deepStrictEqual(removeMatch(values.fields), [
         {
           ...defaultDataField,
-          dartClass: null,
+          parentType: null,
           isVariable: true,
           name: "str",
           type: null,
@@ -844,7 +846,7 @@ String func(G<B?> d) {
         },
         {
           ...defaultDataField,
-          dartClass: null,
+          parentType: null,
           isFinal: true,
           name: "str2",
           type: null,
@@ -884,7 +886,7 @@ String func(G<B?> d) {
       isOperator: false,
       generics: null,
       params: [],
-      dartClass: bClass,
+      parentType: bClass,
       comment: null,
       annotations: [],
     };
@@ -1032,7 +1034,7 @@ String func(G<B?> d) {
         // }
         {
           ...defaultData,
-          dartClass: null,
+          parentType: null,
           returnType: "String",
           name: "func",
           comment: "/* Comment under annotation*/",
@@ -1118,7 +1120,7 @@ class B extends Other {
               isVariable: false,
               type: "int?",
               defaultValue: null,
-              dartClass: values.classes[0],
+              parentType: values.classes[0],
               comment: null,
               annotations: [],
             },
@@ -1129,7 +1131,7 @@ class B extends Other {
               isVariable: false,
               type: "String",
               defaultValue: null,
-              dartClass: values.classes[0],
+              parentType: values.classes[0],
               comment: null,
               annotations: [],
             },
@@ -1147,7 +1149,7 @@ class B extends Other {
       isConst: false,
       isFactory: false,
       name: null,
-      dartClass: dartClass,
+      dartType: dartClass,
       comment: null,
       annotations: [],
       body: null,
