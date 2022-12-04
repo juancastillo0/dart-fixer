@@ -6,8 +6,14 @@ import {
   DartExtension,
   DartField,
   DartFunction,
+  DartFunctionParam,
   DartMixin,
   DartType,
+  // DartDefBase,
+  DartConstructorParam,
+  DartClass,
+  DartTypeAlias,
+  DartImport,
 } from "../parser";
 import { Bracket, getBrackets } from "../parser-utils";
 
@@ -1457,9 +1463,10 @@ class B extends Other {
   });
 });
 
-function removeMatch(
+export function removeMatch(
   values: Array<unknown>,
-  keysToRemove: Array<string> = []
+  keysToRemove: Array<string> = [],
+  opts?: { removeInstances?: boolean }
 ): Array<unknown> {
   return values.map((v) => {
     if (typeof v !== "object") {
@@ -1476,8 +1483,24 @@ function removeMatch(
     }
     for (const [key, value] of [...Object.entries(obj)]) {
       if (Array.isArray(value)) {
-        obj[key] = removeMatch(value);
+        obj[key] = removeMatch(value, keysToRemove, opts);
       } else if (typeof value === "function") {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete obj[key];
+      } else if (
+        opts?.removeInstances &&
+        (value instanceof DartClass ||
+          value instanceof DartMixin ||
+          value instanceof DartExtension ||
+          value instanceof DartEnum ||
+          value instanceof DartTypeAlias ||
+          value instanceof DartFunction ||
+          value instanceof DartField ||
+          value instanceof DartConstructor ||
+          value instanceof DartImport ||
+          value instanceof DartConstructorParam ||
+          value instanceof DartFunctionParam)
+      ) {
         // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete obj[key];
       }
