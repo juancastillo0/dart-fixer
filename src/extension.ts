@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { DartAnalyzer } from "./analyzer";
+import { CommentsCodeActions } from "./dart-docs/vscode-docs-diagnostic";
 import { GeneratedSection, JsonFileKind } from "./generator-utils";
 import {
   executeJsonToDartCommand,
@@ -57,6 +58,17 @@ export function activate(context: vscode.ExtensionContext): void {
       { language: "dart", scheme: "file" },
       new DartCodeActionProvider(fixerDiagnostics, analyzer),
       DartCodeActionProvider.metadata
+    )
+  );
+
+  const snippetsDiagnostics =
+    vscode.languages.createDiagnosticCollection("dart-snippets");
+  context.subscriptions.push(snippetsDiagnostics);
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { scheme: "file", pattern: "**/*.{dart,md,mdx}" },
+      new CommentsCodeActions(snippetsDiagnostics, analyzer),
+      CommentsCodeActions.metadata
     )
   );
 
