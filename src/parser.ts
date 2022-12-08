@@ -5,6 +5,14 @@ import {
   getBrackets,
 } from "./parser-utils";
 
+export interface LexerComment {
+  kind: "multiline" | "singleline";
+  text: string;
+  line: number;
+  index: number;
+  column: number;
+}
+
 export interface DartParserConfig {
   packageName?: string;
 }
@@ -38,6 +46,30 @@ export interface DartDefBase {
   bracket: BracketWithOriginal | null;
 }
 
+export type DartFileHeader =
+  | {
+      kind: DartFileKind.library;
+      parts: Array<{
+        annotations: Array<DartMetadata>;
+        uri: string;
+      }>;
+      library: {
+        annotations: Array<DartMetadata>;
+        identifier: string;
+      } | null;
+    }
+  | {
+      kind: DartFileKind.part;
+      annotations: Array<DartMetadata>;
+      identifier: string;
+      isUri: boolean;
+    };
+
+export enum DartFileKind {
+  library,
+  part,
+}
+
 export interface DartMetadata {
   qualifiedName: string;
   args: string | null;
@@ -53,9 +85,11 @@ export interface DartImportsData {
   extensions: Array<DartExtension>;
   fields: Array<DartField>;
   typeAliases: Array<DartTypeAlias>;
+  comments: Array<LexerComment>;
+  fileHeader: DartFileHeader;
 }
 
-export class DartImports implements DartImportsData {
+export class DartParsedFile implements DartImportsData {
   readonly imports: Array<DartImport>;
   readonly classes: Array<DartClass>;
   readonly functions: Array<DartFunction>;
@@ -64,24 +98,31 @@ export class DartImports implements DartImportsData {
   readonly extensions: Array<DartExtension>;
   readonly fields: Array<DartField>;
   readonly typeAliases: Array<DartTypeAlias>;
+  readonly comments: Array<LexerComment>;
+  readonly fileHeader: DartFileHeader;
 
   readonly cleanText: CleanedText;
   readonly config: DartParserConfig;
 
   constructor(
-    text: Partial<DartImportsData> & { cleanText: CleanedText },
+    params: Partial<DartImportsData> & {
+      cleanText: CleanedText;
+      fileHeader: DartFileHeader;
+    },
     config?: DartParserConfig
   ) {
     this.config = config ?? {};
-    this.imports = text.imports ?? [];
-    this.classes = text.classes ?? [];
-    this.functions = text.functions ?? [];
-    this.cleanText = text.cleanText;
-    this.enums = text.enums ?? [];
-    this.mixins = text.mixins ?? [];
-    this.extensions = text.extensions ?? [];
-    this.fields = text.fields ?? [];
-    this.typeAliases = text.typeAliases ?? [];
+    this.imports = params.imports ?? [];
+    this.classes = params.classes ?? [];
+    this.functions = params.functions ?? [];
+    this.cleanText = params.cleanText;
+    this.enums = params.enums ?? [];
+    this.mixins = params.mixins ?? [];
+    this.extensions = params.extensions ?? [];
+    this.fields = params.fields ?? [];
+    this.typeAliases = params.typeAliases ?? [];
+    this.comments = params.comments ?? [];
+    this.fileHeader = params.fileHeader;
   }
 
   get hasImports(): boolean {

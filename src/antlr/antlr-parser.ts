@@ -38,6 +38,7 @@ import {
   MultiLineStringContext,
   ImportOrExportContext,
   MetadatumContext,
+  PartDeclarationContext,
 } from "../antlr/generated-antlr/DartParser";
 import { DartLexer } from "../antlr/generated-antlr/DartLexer";
 import {
@@ -58,12 +59,15 @@ import {
   DartFunction,
   DartFunctionParam,
   DartImport,
-  DartImports,
+  DartParsedFile,
   DartMixin,
   DartParserConfig,
   DartTypeScope,
   DartTypeAlias,
   DartMetadata,
+  LexerComment,
+  DartFileHeader,
+  DartFileKind,
 } from "../parser";
 import { Interval } from "antlr4ts/misc/Interval";
 import {
@@ -73,20 +77,12 @@ import {
 } from "../parser-utils";
 import { zip } from "../utils";
 
-interface LexerComment {
-  kind: "multiline" | "singleline";
-  text: string;
-  line: number;
-  index: number;
-  column: number;
-}
-
 export class ParseCtx {
   inputStream: ANTLRInputStream;
   lexer: DartLexer;
   tokenStream: CommonTokenStream;
   parser: DartParser;
-  tree: LibraryDefinitionContext;
+  tree: LibraryDefinitionContext | PartDeclarationContext;
   comments: Array<LexerComment>;
 
   constructor(text: string) {
@@ -94,7 +90,11 @@ export class ParseCtx {
     this.lexer = new DartLexer(this.inputStream);
     this.tokenStream = new CommonTokenStream(this.lexer);
     this.parser = new DartParser(this.tokenStream);
-    this.tree = this.parser.libraryDefinition();
+    try {
+      this.tree = this.parser.libraryDefinition();
+    } catch (error) {
+      this.tree = this.parser.partDeclaration();
+    }
     this.comments = this.lexer.comments as Array<LexerComment>;
   }
 
@@ -165,12 +165,12 @@ export class ParseCtx {
 export const parseClassesAntlr = (
   text: string,
   config?: DartParserConfig
-): DartImports => {
+): DartParsedFile => {
   // Create the lexer and parser
   const ctx = new ParseCtx(text);
   const { tree, getIntervalText } = ctx;
-
-  const importOrExport = tree.importOrExport();
+  const isPartOf = "partHeader" in tree;
+  const importOrExport = isPartOf ? [] : tree.importOrExport();
   const imports: Array<DartImport> = importOrExport.map((e) =>
     mapContextToDartImport(ctx, e, config)
   );
@@ -183,7 +183,7 @@ export const parseClassesAntlr = (
   const fields: Array<DartField> = [];
   const typeAliases: Array<DartTypeAlias> = [];
 
-  const metadataForTopLevel = tree.metadata();
+  const metadataForTopLevel = "metadata" in tree ? tree.metadata() : [];
   const definitionsForTopLevel = tree.topLevelDefinition();
   let defIndex = 0;
 
@@ -310,8 +310,8 @@ export const parseClassesAntlr = (
       fields.push(...mapField(ctx, def, null, data));
     }
   }
-
-  const parsedOutput = new DartImports(
+  const fileHeader = getFileHeader(ctx, tree);
+  const parsedOutput = new DartParsedFile(
     {
       classes,
       imports,
@@ -322,10 +322,57 @@ export const parseClassesAntlr = (
       extensions,
       fields,
       typeAliases,
+      comments: ctx.comments,
+      fileHeader,
     },
     config
   );
   return parsedOutput;
+};
+
+const getFileHeader = (
+  ctx: ParseCtx,
+  tree: LibraryDefinitionContext | PartDeclarationContext
+): DartFileHeader => {
+  let fileHeader: DartFileHeader;
+  if ("partHeader" in tree) {
+    // partDeclaration
+    // :    partHeader (metadata topLevelDefinition)* EOF
+    // ;
+    // partHeader
+    // :    metadata PART OF (dottedIdentifierList | uri)';'
+    // ;
+    const header = tree.partHeader();
+    fileHeader = {
+      kind: DartFileKind.part,
+      annotations: getMetadata(ctx, header.metadata().metadatum()),
+      identifier: (header.dottedIdentifierList() ?? header.uri())!.text,
+      isUri: !!header.uri(),
+    };
+  } else {
+    // libraryName
+    // :    metadata LIBRARY dottedIdentifierList ';'
+    // ;
+    const libName = tree.libraryName();
+    // partDirective
+    // :    metadata PART uri ';'
+    // ;
+    const parts = tree.partDirective().map((p) => ({
+      annotations: getMetadata(ctx, p.metadata().metadatum()),
+      uri: p.uri().text,
+    }));
+    fileHeader = {
+      kind: DartFileKind.library,
+      parts,
+      library: libName
+        ? {
+            annotations: getMetadata(ctx, libName.metadata().metadatum()),
+            identifier: libName.dottedIdentifierList().text,
+          }
+        : null,
+    };
+  }
+  return fileHeader;
 };
 
 enum TypeDefinitionKind {

@@ -13,7 +13,7 @@ import {
   resolveUri,
   ResolveUriParams,
 } from "./dart-dependencies";
-import { DartImports, DartType, DartTypeAlias, DartTypeDef } from "./parser";
+import { DartParsedFile, DartType, DartTypeAlias, DartTypeDef } from "./parser";
 import { GenerationOptions } from "./printer";
 import * as path from "path";
 import * as minimatch from "minimatch";
@@ -31,11 +31,11 @@ export abstract class FileSystemManager {
 class FileSystemMockImpl implements FileSystemManager {
   constructor(public values: Map<string, TextDocument>) {}
 
-  openTextDocument(path: string): Promise<TextDocument> {
-    let value = this.values.get(path);
+  openTextDocument(documentPath: string): Promise<TextDocument> {
+    let value = this.values.get(documentPath);
     if (!value) {
-      value = { getText: () => "", uri: path, version: 0 };
-      this.values.set(path, value);
+      value = { getText: () => "", uri: documentPath, version: 0 };
+      this.values.set(documentPath, value);
     }
     return Promise.resolve(value);
   }
@@ -60,7 +60,7 @@ export interface ParsedDartFile {
 }
 
 export interface ParsedDartFileData {
-  values: DartImports;
+  values: DartParsedFile;
   config: GenerationOptions | undefined;
   pubSpecInfo: PubSpecParsed | undefined;
   generatedSections: Map<string, GeneratedSection>;

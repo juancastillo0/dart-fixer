@@ -1199,7 +1199,7 @@ partHeader
     ;
 
 partDeclaration
-    :    partHeader topLevelDefinition* EOF
+    :    partHeader (metadata topLevelDefinition)* EOF
     ;
 
 // In the specification a plain <stringLiteral> is used.
