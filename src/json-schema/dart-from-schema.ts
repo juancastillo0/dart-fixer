@@ -492,8 +492,8 @@ function extractDiscriminantMapping(
     for (const fieldName of stringProps) {
       const mapping = new Map<string, DartClass>();
       const allDifferent = [...classesDiscriminant.entries()].every(
-        ([c, v]) => {
-          const f = v.find((f) => f.field.name === fieldName)!;
+        ([c, fields]) => {
+          const f = fields.find((field) => field.field.name === fieldName)!;
           return !mapping.has(f.discriminant) && mapping.set(f.discriminant, c);
         }
       );
