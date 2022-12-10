@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { DartAnalyzer } from "../analyzer";
 import { LexerComment } from "../parser";
-import { textDocumentFromVsCode } from "../vscode-utils";
+import { pathFromUri, textDocumentFromVsCode } from "../vscode-utils";
 import {
   CommentSection,
   dartCommentSections,
@@ -27,6 +27,19 @@ interface DiagnosticWithAction {
   diagnostic: vscode.Diagnostic;
 }
 
+type SectionDependents = {
+  uses: Set<CommentSectionWithKind>;
+} & (
+  | {
+      uri: vscode.Uri;
+      definition: CommentSectionWithKind;
+    }
+  | {
+      uri: null;
+      definition: null;
+    }
+);
+
 export class CommentsCodeActions implements vscode.CodeActionProvider {
   constructor(
     public collection: vscode.DiagnosticCollection,
@@ -49,21 +62,12 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
     }
   >();
   // Name to imports
-  sectionDependencies = new Map<
-    string,
-    {
-      uses: Set<CommentSectionWithKind>;
-    } & (
-      | {
-          uri: vscode.Uri;
-          definition: CommentSectionWithKind;
-        }
-      | {
-          uri: null;
-          definition: null;
-        }
-    )
-  >();
+  sectionDependencies = new Map<string, SectionDependents>();
+
+  diagnosticsForFile(uri: string): Array<DiagnosticWithAction> {
+    const fileData = this.sections.get(uri);
+    return [...(fileData?.diagnostics?.values() ?? [])];
+  }
 
   async provideCodeActions(
     document: vscode.TextDocument,
@@ -76,16 +80,12 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
     console.log("provideCodeActions");
     try {
       await this.refreshDiagnostics(document);
-      const diagnostics = [
-        ...(this.sections.get(document.uri.path)?.diagnostics?.values() ?? []),
-      ];
+      const diagnostics = this.diagnosticsForFile(pathFromUri(document.uri));
       console.log("sections::", this.sections);
       console.log("sectionDependencies::", this.sectionDependencies);
       const actions = diagnostics
-        .map((d) => d.action)
-        .filter(
-          (d) => !!d?.edit && d.edit.entries()[0][1][0].range.contains(range)
-        ) as Array<vscode.CodeAction>;
+        .filter((d) => d.diagnostic.range.contains(range))
+        .map((d) => d.action) as Array<vscode.CodeAction>;
       return actions;
     } catch (error) {
       console.error(error);
@@ -98,14 +98,18 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
    * @param doc text document to analyze
    */
   async refreshDiagnostics(doc: vscode.TextDocument): Promise<void> {
-    const previousData = this.sections.get(doc.uri.path);
-    if (previousData?.documentVersion === doc.version) {
-      return;
-    }
     const updatedDiagnosticUris = new DiagnosticsHandler(this);
     const fileSectionsResult = await this.extractFileSections(doc);
     if (fileSectionsResult.error) {
       console.error(fileSectionsResult.error);
+      return;
+    }
+
+    const previousFileSections = this.sections.get(pathFromUri(doc.uri));
+    if (
+      previousFileSections?.documentVersion &&
+      previousFileSections.documentVersion > doc.version
+    ) {
       return;
     }
     const fileSections = fileSectionsResult.fileSections;
@@ -115,24 +119,29 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
       string,
       CommentSectionWithKind
     >();
-    fileSections
-      .filter((s) => s.section.kind === "define")
-      .forEach((s) => {
-        const previous = fileSectionsDefinitionsMap.get(s.section.name);
-        if (previous) {
-          // duplicate section definition in same file
-          updatedDiagnosticUris.updateDiagnostic(
+    for (const s of fileSections) {
+      if (s.section.kind !== "define") {
+        continue;
+      }
+      const previous = fileSectionsDefinitionsMap.get(s.section.name);
+      if (previous) {
+        // duplicate section definition in same file
+        updatedDiagnosticUris.updateDiagnostic(
+          s,
+          this.createDiagnostic(
+            doc,
             s,
-            this.createDiagnostic(doc, s, "multiple-definitions", previous)
-          );
-        } else {
-          fileSectionsDefinitionsMap.set(s.section.name, s);
-        }
-      });
+            SnippetDiagnosticKind.multipleDefinitions,
+            previous
+          )
+        );
+      } else {
+        fileSectionsDefinitionsMap.set(s.section.name, s);
+      }
+    }
 
-    const previousFileSections = this.sections.get(doc.uri.path);
     if (previousFileSections) {
-      for (const p of previousFileSections.sections) {
+      for (const p of previousFileSections.sections.reverse()) {
         const name = p.section.name;
         const def = this.sectionDependencies.get(name)!;
         switch (p.section.kind) {
@@ -145,9 +154,19 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
                 uri: null,
               });
               for (const use of def.uses) {
+                if (use.uri === p.uri) {
+                  // They will be processed in the other for-loop
+                  // for the current include sections in the file
+                  continue;
+                }
                 updatedDiagnosticUris.updateDiagnostic(
                   use,
-                  this.createDiagnostic(doc, use, "no-definition", null)
+                  this.createDiagnostic(
+                    doc,
+                    use,
+                    SnippetDiagnosticKind.noDefinition,
+                    null
+                  )
                 );
               }
             }
@@ -155,21 +174,25 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
           }
           case "include": {
             // remove from diagnostics and dependencies
-            def.uses.delete(p);
+            const deleted = def.uses.delete(p);
+            if (!deleted) {
+              console.error(`Could not delete dependent section`, p);
+            }
             updatedDiagnosticUris.deleteDiagnostic(p);
             break;
           }
         }
       }
     }
-    this.sections.set(doc.uri.path, {
+    this.sections.set(pathFromUri(doc.uri), {
       sections: fileSections,
-      diagnostics: new Map(),
+      diagnostics:
+        previousFileSections?.diagnostics ??
+        new Map<CommentSectionWithKind, DiagnosticWithAction>(),
       documentVersion: doc.version,
     });
 
     for (const section of fileSections) {
-      console.log("Process section", section);
       const name = section.section.name;
       let dependencies = this.sectionDependencies.get(name);
 
@@ -183,25 +206,37 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
             };
             this.sectionDependencies.set(name, dependencies);
           }
-          if (dependencies.uri && dependencies.uri.path !== doc.uri.path) {
+          if (
+            dependencies.uri &&
+            pathFromUri(dependencies.uri) !== pathFromUri(doc.uri)
+          ) {
             // multiple definitions
             updatedDiagnosticUris.updateDiagnostic(
               section,
               this.createDiagnostic(
                 doc,
                 section,
-                "multiple-definitions",
+                SnippetDiagnosticKind.multipleDefinitions,
                 dependencies.definition
               )
             );
           } else {
             dependencies.definition = section;
             for (const use of dependencies.uses) {
-              if (use.text !== section.text) {
+              if (
+                // use.uri !== section.uri &&
+                !getSectionText({ include: use, definition: section })
+                  .isUpToDate
+              ) {
                 // different content
                 updatedDiagnosticUris.updateDiagnostic(
                   use,
-                  this.createDiagnostic(doc, use, "different-content", section)
+                  this.createDiagnostic(
+                    doc,
+                    use,
+                    SnippetDiagnosticKind.differentContent,
+                    section
+                  )
                 );
               }
             }
@@ -212,30 +247,40 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
           if (!dependencies?.definition) {
             // no definition for snippet
             dependencies = {
-              uses: new Set(),
+              uses: dependencies?.uses ?? new Set(),
               definition: null,
               uri: null,
             };
             this.sectionDependencies.set(name, dependencies);
             updatedDiagnosticUris.updateDiagnostic(
               section,
-              this.createDiagnostic(doc, section, "no-definition", null)
+              this.createDiagnostic(
+                doc,
+                section,
+                SnippetDiagnosticKind.noDefinition,
+                null
+              )
             );
           } else {
-            dependencies.uses.add(section);
-            if (dependencies.definition.text !== section.text) {
+            if (
+              !getSectionText({
+                include: section,
+                definition: dependencies.definition,
+              }).isUpToDate
+            ) {
               // different content
               updatedDiagnosticUris.updateDiagnostic(
                 section,
                 this.createDiagnostic(
                   doc,
                   section,
-                  "different-content",
+                  SnippetDiagnosticKind.differentContent,
                   dependencies.definition
                 )
               );
             }
           }
+          dependencies.uses.add(section);
           break;
         }
       }
@@ -248,9 +293,7 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
       this.collection.set(
         vscode.Uri.parse(uri),
         // TODO: is this necessary? since we already provide the actions?
-        [...(this.sections.get(uri)?.diagnostics?.values() ?? [])].map(
-          (d) => d.diagnostic
-        )
+        this.diagnosticsForFile(uri).map((d) => d.diagnostic)
       );
     }
   }
@@ -260,13 +303,12 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
     fileSections: Array<CommentSectionWithKind>;
   }> {
     const fileSections: Array<CommentSectionWithKind> = [];
-    console.log("doc.languageId", doc.languageId);
     if (doc.languageId === "markdown") {
       fileSections.push(
         ...markdownSections(doc.getText()).map((section) => ({
           section,
           kind: CommentSectionKind.markdown,
-          uri: doc.uri.path,
+          uri: pathFromUri(doc.uri),
           text: doc.getText(rangeFromSection(section)),
         }))
       );
@@ -300,7 +342,7 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
         ...singleLineDart.map((section) => ({
           section,
           kind: CommentSectionKind.dart,
-          uri: doc.uri.path,
+          uri: pathFromUri(doc.uri),
           text: doc.getText(rangeFromSection(section)),
         }))
       );
@@ -309,18 +351,29 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
         .filter((c) => !isSingleLine(c.content))
         .flatMap((c) =>
           dartCommentSections(c.content).map((s) => ({
-            ...s,
-            end: s.end ? s.end + c.end : c.end,
-            start: s.start + c.start,
+            kind: c.content.startsWith("///")
+              ? CommentSectionKind.dartComment
+              : CommentSectionKind.markdown,
+            section: {
+              ...s,
+              start: s.start + c.start,
+              end: s.end ? s.end + c.start - 1 : null,
+            },
           }))
         );
       fileSections.push(
-        ...commentsDart.map((section) => ({
-          section,
-          kind: CommentSectionKind.dartComment,
-          uri: doc.uri.path,
-          text: doc.getText(rangeFromSection(section)),
-        }))
+        ...commentsDart.map(({ kind, section }) => {
+          let text = doc.getText(rangeFromSection(section));
+          if (kind === CommentSectionKind.dartComment) {
+            text = text.replace(/(^|\n)\/\/\/ ?/g, (_, a) => a as string);
+          }
+          return {
+            section,
+            kind,
+            uri: pathFromUri(doc.uri),
+            text,
+          };
+        })
       );
     }
     fileSections.sort((a, b) =>
@@ -336,13 +389,11 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
   createDiagnostic(
     _: vscode.TextDocument,
     section: CommentSectionWithKind,
-    kind: "no-definition" | "multiple-definitions" | "different-content",
+    kind: SnippetDiagnosticKind,
     otherSection: CommentSectionWithKind | null
   ): { action?: vscode.CodeAction; diagnostic: vscode.Diagnostic } {
-    // create range that represents, where in the document the word is
-    const range = rangeFromSection(section.section);
     const diagnostic = new vscode.Diagnostic(
-      range,
+      rangeFromSection(section.section, { withComments: true }),
       "PLACEHOLDER", // will be set afterwards
       vscode.DiagnosticSeverity.Error
     );
@@ -351,14 +402,14 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
     let action: vscode.CodeAction | undefined;
     const sectionName = section.section.name;
     switch (kind) {
-      case "no-definition":
+      case SnippetDiagnosticKind.noDefinition:
         message = `No definition found for snippet "${sectionName}"`;
         break;
-      case "multiple-definitions":
+      case SnippetDiagnosticKind.multipleDefinitions:
         // TODO: show error in other
         message = `Duplicate definition found for snippet "${sectionName}"`;
         break;
-      case "different-content": {
+      case SnippetDiagnosticKind.differentContent: {
         message = `Content for snipper "${sectionName}" is outdated`;
         action = new vscode.CodeAction(
           "Fix code snippet",
@@ -368,8 +419,12 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
         action.isPreferred = true;
         // TODO: action.command
         const edit = new vscode.WorkspaceEdit();
-        // TODO: when `section.section.end === null` add `// snippet-include-end:name`
-        edit.replace(vscode.Uri.parse(section.uri), range, otherSection!.text);
+        const content = getSectionText({
+          include: section,
+          definition: otherSection!,
+        });
+        const editRange = rangeFromSection(section.section);
+        edit.replace(vscode.Uri.parse(section.uri), editRange, content.output);
         action.edit = edit;
         break;
       }
@@ -399,12 +454,64 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
       )
     );
 
-    context.subscriptions.push(
-      vscode.workspace.onDidCloseTextDocument((doc) =>
-        this.collection.delete(doc.uri)
-      )
-    );
+    // context.subscriptions.push(
+    //   vscode.workspace.onDidCloseTextDocument((doc) =>
+    //     this.collection.delete(doc.uri)
+    //   )
+    // );
   }
+}
+
+const getSectionText = ({
+  definition,
+  include,
+}: {
+  definition: CommentSectionWithKind;
+  include: CommentSectionWithKind;
+}): { output: string; isUpToDate: boolean } => {
+  let result: ReturnType<typeof getSectionText>;
+  if (
+    (definition.kind === CommentSectionKind.dartComment ||
+      definition.kind === CommentSectionKind.markdown) &&
+    (include.kind === CommentSectionKind.dartComment ||
+      include.kind === CommentSectionKind.markdown)
+  ) {
+    result = {
+      output: definition.text,
+      isUpToDate: definition.text === include.text,
+    };
+  } else {
+    const content =
+      definition.kind === CommentSectionKind.dart &&
+      include.kind !== CommentSectionKind.dart
+        ? "```dart\n" + definition.text + "```\n"
+        : definition.text;
+    result = {
+      output: content,
+      isUpToDate: content === include.text,
+    };
+  }
+  if (!include.section.end) {
+    const endSnippet = `snippet-include-end:${include.section.name}`;
+    if (include.kind === CommentSectionKind.dart) {
+      result.output = result.output + `\n// ${endSnippet}`;
+    } else {
+      result.output = result.output + `<!-- ${endSnippet} -->\n`;
+    }
+  }
+  // TODO: should we add /// for definitions in markdown that are included in dart?
+  if (include.kind === CommentSectionKind.dartComment) {
+    result.output =
+      "/// " +
+      result.output.replace(/\n/g, "\n/// ").replace(/\n\/\/\/ $/g, "\n");
+  }
+  return result;
+};
+
+enum SnippetDiagnosticKind {
+  noDefinition = "noDefinition",
+  multipleDefinitions = "multipleDefinitions",
+  differentContent = "differentContent",
 }
 
 class DiagnosticsHandler {
@@ -438,11 +545,16 @@ class DiagnosticsHandler {
   };
 }
 
-const rangeFromSection = (section: CommentSection): vscode.Range => {
+const rangeFromSection = (
+  section: CommentSection,
+  opts?: { withComments?: boolean }
+): vscode.Range => {
+  const delta = opts?.withComments ? 0 : 1;
+  const start = section.start + delta;
   const range = new vscode.Range(
-    section.start,
+    start,
     0,
-    (section.end ?? section.start + 2) - 1,
+    (section.end ?? start + 2) - 1 - delta,
     0
   );
   return range;

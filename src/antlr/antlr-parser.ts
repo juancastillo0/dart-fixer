@@ -95,7 +95,24 @@ export class ParseCtx {
     } catch (error) {
       this.tree = this.parser.partDeclaration();
     }
-    this.comments = this.lexer.comments as Array<LexerComment>;
+    this.comments = [];
+    let prev: LexerComment | undefined;
+    for (const c of this.lexer.comments as Array<LexerComment>) {
+      if (
+        prev?.text?.startsWith("///") &&
+        c.text.startsWith("///") &&
+        prev.line === c.line - 1
+      ) {
+        const aggregation = this.comments[this.comments.length - 1];
+        this.comments[this.comments.length - 1] = {
+          ...aggregation,
+          text: aggregation.text + c.text,
+        };
+      } else {
+        this.comments.push({ ...c });
+      }
+      prev = c;
+    }
   }
 
   getIntervalText = <T extends ParserRuleContext | undefined>(

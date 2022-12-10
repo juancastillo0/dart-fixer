@@ -59,12 +59,11 @@ export const snippetSections = (
     const end = groups["end"];
     const name = groups["name"];
     const params = groups["params"];
-    const delta = documentKind === "code" ? -1 : 0;
 
     const start = htmlCommentsByName.get(`${name}-${kind}`);
     if (end) {
       if (start) {
-        start.end = t.end + delta;
+        start.end = t.end;
       } else {
         console.error("START SECTION NOT FOUND:", t);
       }
@@ -73,7 +72,7 @@ export const snippetSections = (
         kind: kind,
         name: name,
         params: params ? (JSON.parse(params) as Record<string, unknown>) : null,
-        start: t.start + delta,
+        start: t.start - 2,
         comment: t.content,
         end: null,
       };

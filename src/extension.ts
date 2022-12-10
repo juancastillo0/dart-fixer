@@ -64,10 +64,15 @@ export function activate(context: vscode.ExtensionContext): void {
   const snippetsDiagnostics =
     vscode.languages.createDiagnosticCollection("dart-snippets");
   context.subscriptions.push(snippetsDiagnostics);
+  const commentsCodeAction = new CommentsCodeActions(
+    snippetsDiagnostics,
+    analyzer
+  );
+  commentsCodeAction.subscribeToDocumentChanges(context);
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { scheme: "file", pattern: "**/*.{dart,md,mdx}" },
-      new CommentsCodeActions(snippetsDiagnostics, analyzer),
+      commentsCodeAction,
       CommentsCodeActions.metadata
     )
   );
