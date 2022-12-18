@@ -740,7 +740,12 @@ export class DartType {
   }
 
   get isNullable(): boolean {
-    return this.text.endsWith("?");
+    return (
+      this.text.endsWith("?") ||
+      this.name === "dynamic" ||
+      this.isNull ||
+      this.isVoid
+    );
   }
   get isPrimitive(): boolean {
     return this.isNum || this.isString || this.isBool || this.isNull;
@@ -810,5 +815,8 @@ export class DartType {
   }
   get isNull(): boolean {
     return this.name === "Null" && this.isNotGeneric;
+  }
+  get isVoid(): boolean {
+    return this.name === "void" && this.isNotGeneric;
   }
 }
