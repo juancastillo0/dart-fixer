@@ -1,4 +1,4 @@
-// generated from "./model.doc.json"
+// generated-dart-fixer-json{"from":"./model.doc.json","kind":"document","md5Hash":"kWrIOsnLIDnOpalUoeQKBA=="}
 
 class Model {
   final String name;

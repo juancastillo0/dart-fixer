@@ -31,7 +31,7 @@ suite("type model schemas JSON", () => {
       analyzer
     );
 
-    const parsed = parseClassesAntlr(value, {
+    const parsed = parseClassesAntlr(value.text, {
       packageName,
     });
     const dartFileText = fs.readFileSync(params.newFile, {

@@ -10,6 +10,7 @@ import {
 } from "./json-type-definition/dart-from-json";
 import { SomeJTDSchemaType } from "./json-type-definition/schema-type";
 import { generate } from "./printer";
+import { createHash } from "crypto";
 
 export interface GeneratedSection {
   md5Hash: string;
@@ -63,16 +64,16 @@ export interface JsonEditParams {
 }
 
 export enum JsonFileKind {
-  document,
-  schema,
-  typeDefinition,
+  document = "document",
+  schema = "schema",
+  typeDefinition = "typeDefinition",
 }
 
 export const createDartModelFromJSON = async (
   document: JsonEditParams,
   kind: JsonFileKind,
   analyzer: DartAnalyzer | undefined
-): Promise<string> => {
+): Promise<{ text: string; md5Hash: string }> => {
   const text = document.text;
   const newFile = document.newFile;
   const { identifierName } = nameFromFile(newFile);
@@ -101,26 +102,23 @@ export const createDartModelFromJSON = async (
     path: document.jsonFile,
     relativeTo: newFile,
   });
-
-  let dartFileText = generateDartFileFromJsonData({
+  const params = {
     ctx,
     fileName,
     analyzer,
     newFile,
-  });
+    kind,
+  };
+
+  let dartFileText = generateDartFileFromJsonData(params);
   if (analyzer) {
     const value = await analyzer.getData({
-      getText: () => dartFileText,
+      getText: () => dartFileText.text,
       uri: newFile,
       version: 0,
     });
     if (!value.error) {
-      dartFileText = generateDartFileFromJsonData({
-        ctx,
-        fileName,
-        analyzer,
-        newFile,
-      });
+      dartFileText = generateDartFileFromJsonData(params);
     }
   }
   return dartFileText;
@@ -155,12 +153,12 @@ const generateDartFileFromJsonData = (params: {
   fileName: string;
   analyzer: DartAnalyzer | undefined;
   newFile: string;
-}): string => {
+  kind: JsonFileKind;
+}): { text: string; md5Hash: string } => {
   const ctx = params.ctx;
   const printer = new DartModelPrinter();
   const classes = [...ctx.classes.values()];
   const dartFileText = `\
-// generated from "${params.fileName}"
 ${[...ctx.imports.values()].join("\n")}\
 
 ${classes
@@ -186,5 +184,34 @@ ${[...ctx.primitiveRefs.entries()]
   .map(([name, type]) => `typedef ${name} = ${type};`)
   .join("\n\n")}
 `;
-  return dartFileText;
+  const md5Hash = createHash("md5").update(dartFileText).digest("base64");
+
+  const commentData: CommentDartFromJson = {
+    from: params.fileName,
+    kind: params.kind,
+    md5Hash,
+  };
+  const text = `// generated-dart-fixer-json${JSON.stringify(
+    commentData
+  )}\n${dartFileText}`;
+  return { text, md5Hash };
+};
+
+const JSON_SECTION_REGEXP =
+  /^\/\/ generated-dart-fixer-json(?<json>{[^\r\n]*})([\r\n]|$)/g;
+
+interface CommentDartFromJson {
+  from: string;
+  md5Hash: string;
+  kind: JsonFileKind;
+}
+
+export const getCommentGeneratedDartFromJson = (
+  text: string
+): CommentDartFromJson | undefined => {
+  const match = [...text.matchAll(JSON_SECTION_REGEXP)][0];
+  if (match) {
+    return JSON.parse(match.groups!["json"]) as CommentDartFromJson;
+  }
+  return undefined;
 };
