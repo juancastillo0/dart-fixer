@@ -1,9 +1,9 @@
 import { DartImport } from "./parser";
-import { GenerationOptions } from "./printer";
 import * as fs from "fs";
 import * as yaml from "yaml";
 import { FileSystemManager } from "./analyzer";
 import * as path from "path";
+import { ExtensionConfig } from "./extension-config";
 
 export type PubSpecDependency = Record<
   string,
@@ -27,7 +27,7 @@ export interface PubSpecData {
   dependency_overrides?: PubSpecDependency;
   flutter?: Record<string, unknown>;
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  dart_fixer?: GenerationOptions;
+  dart_fixer?: ExtensionConfig;
 }
 
 export type Path = string;
@@ -38,15 +38,23 @@ export const getDartPackageData = async (
   const result = new Map<Path, PubSpecData>();
   const pubspecs = await fsControl.findFiles("pubspec.yaml");
   for (const pubspec of pubspecs) {
-    try {
-      const content = await fsControl.openTextDocument(pubspec);
-      const data = yaml.parse(content.getText()) as PubSpecData;
+    const content = await fsControl.openTextDocument(pubspec);
+    const data = parsePubspec(content.getText());
+    if (data) {
       result.set(pubspec, data);
-    } catch (error) {
-      console.error("Error parsing pubspec.yaml", error);
     }
   }
   return result;
+};
+
+export const parsePubspec = (text: string): PubSpecData | undefined => {
+  try {
+    const data = yaml.parse(text) as PubSpecData;
+    return data;
+  } catch (error) {
+    console.error("Error parsing pubspec.yaml", error);
+    return undefined;
+  }
 };
 
 export const getRootDir = (params: {

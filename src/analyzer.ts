@@ -17,6 +17,7 @@ import { DartParsedFile, DartType, DartTypeAlias, DartTypeDef } from "./parser";
 import { GenerationOptions } from "./printer";
 import * as path from "path";
 import * as minimatch from "minimatch";
+import { getDefaultGeneratorConfig } from "./extension-config";
 
 // https://stackoverflow.com/questions/69333492/vscode-create-a-document-in-memory-with-uri-for-automated-testing
 export abstract class FileSystemManager {
@@ -83,6 +84,33 @@ export class DartAnalyzer {
 
   updateConfig = (globalConfig: GenerationOptions | undefined): void => {
     this.globalConfig = globalConfig;
+    // TODO: update cache
+  };
+
+  updatePubspec = async (uri: string, pubspec: PubSpecData): Promise<void> => {
+    if (!this.pubSpecDataMap) {
+      return;
+    }
+    // const prev = this.pubSpecDataMap.get(uri);
+    // if (prev) {
+    //   // TODO: return; don't override if it did not change
+    // }
+    this.pubSpecDataMap.set(uri, pubspec);
+
+    // update cache
+    const promises: Array<Promise<unknown>> = [];
+    for (const [file, data] of this.cache) {
+      if (!data.data.pubSpecInfo || data.data.pubSpecInfo.uri === uri) {
+        promises.push(
+          this.getData({
+            getText: () => data.text,
+            version: data.version,
+            uri: file,
+          })
+        );
+      }
+    }
+    await Promise.all(promises);
   };
 
   resolveType = (params: {
@@ -253,7 +281,9 @@ export class DartAnalyzer {
         generatedSections,
         pubSpecInfo: pubSpecDataE,
         // TODO: merge config
-        config: pubSpecDataE?.data?.dart_fixer ?? this.globalConfig,
+        config:
+          getDefaultGeneratorConfig(pubSpecDataE?.data?.dart_fixer) ??
+          this.globalConfig,
       };
       this.cache.set(document.uri.toString(), {
         version: document.version,

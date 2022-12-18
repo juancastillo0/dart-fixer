@@ -2,13 +2,15 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { DartAnalyzer } from "./analyzer";
+import { parsePubspec } from "./dart-dependencies";
 import { CommentsCodeActions } from "./dart-docs/vscode-docs-diagnostic";
+import { ExtensionConfig, getDefaultGeneratorConfig } from "./extension-config";
 import { GeneratedSection, JsonFileKind } from "./generator-utils";
 import {
   executeJsonToDartCommand,
   JsonTypeDefinitionDartCodeActionProvider,
 } from "./json-type-definition/vscode-json-edit";
-import { generate, GenerationOptions } from "./printer";
+import { generate } from "./printer";
 import {
   createOutOfDateDiagnostic,
   pathFromUri,
@@ -18,9 +20,21 @@ import {
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
-export const COMMAND_GENERATE_JSON_TYPE_DEFINITION = `${EXTENSION_NAME}.dartModelFromJTD`;
-export const COMMAND_GENERATE_JSON_SCHEMA = `${EXTENSION_NAME}.dartModelFromJsonSchema`;
-export const COMMAND_GENERATE_JSON_DOCUMENT = `${EXTENSION_NAME}.dartModelFromJsonDocument`;
+export const COMMAND_GENERATE_JSON_TYPE_DEFINITION: vscode.Command = {
+  command: `${EXTENSION_NAME}.dartModelFromJTD`,
+  title: "Dart Fixer: Dart Model from JSON Type Definition",
+  tooltip: "Generate Dart Model from JSON Type Definition",
+};
+export const COMMAND_GENERATE_JSON_SCHEMA: vscode.Command = {
+  command: `${EXTENSION_NAME}.dartModelFromJsonSchema`,
+  title: "Dart Fixer: Dart Model from JSON Schema",
+  tooltip: "Generate Dart Model from JSON Schema",
+};
+export const COMMAND_GENERATE_JSON_DOCUMENT: vscode.Command = {
+  command: `${EXTENSION_NAME}.dartModelFromJsonDocument`,
+  title: "Dart Fixer: Dart Model from JSON Model Document",
+  tooltip: "Generate Dart Model from JSON Model Document",
+};
 
 const COMMAND_OBJECT: vscode.Command = {
   command: COMMAND,
@@ -28,7 +42,7 @@ const COMMAND_OBJECT: vscode.Command = {
   tooltip: "FixImports",
 };
 
-const getExtensionConfig = (): GenerationOptions | undefined =>
+const getExtensionConfig = (): ExtensionConfig | undefined =>
   vscode.workspace.getConfiguration(`dartFixer`).get("config");
 
 // this method is called when your extension is activated
@@ -40,19 +54,16 @@ export function activate(context: vscode.ExtensionContext): void {
     `Congratulations, your extension "${EXTENSION_NAME}" is now active!`
   );
 
+  const analyzer = new DartAnalyzer(
+    getDefaultGeneratorConfig(getExtensionConfig()),
+    {
+      fsControl: new VsCodeFileSystem(),
+    }
+  );
+
   const fixerDiagnostics =
     vscode.languages.createDiagnosticCollection("dart-fixer");
   context.subscriptions.push(fixerDiagnostics);
-
-  const analyzer = new DartAnalyzer(getExtensionConfig(), {
-    fsControl: new VsCodeFileSystem(),
-  });
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(() =>
-      analyzer.updateConfig(getExtensionConfig())
-    )
-  );
-
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { language: "dart", scheme: "file" },
@@ -61,6 +72,7 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
+  /// SNIPPETS
   const snippetsDiagnostics =
     vscode.languages.createDiagnosticCollection("dart-snippets");
   context.subscriptions.push(snippetsDiagnostics);
@@ -77,28 +89,79 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
+  /// COMMANDS
   context.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_GENERATE_JSON_TYPE_DEFINITION, () =>
-      executeJsonToDartCommand(JsonFileKind.typeDefinition, { analyzer })
+    vscode.commands.registerCommand(
+      COMMAND_GENERATE_JSON_TYPE_DEFINITION.command,
+      () => executeJsonToDartCommand(JsonFileKind.typeDefinition, { analyzer })
     )
   );
   context.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_GENERATE_JSON_SCHEMA, () =>
+    vscode.commands.registerCommand(COMMAND_GENERATE_JSON_SCHEMA.command, () =>
       executeJsonToDartCommand(JsonFileKind.schema, { analyzer })
     )
   );
   context.subscriptions.push(
-    vscode.commands.registerCommand(COMMAND_GENERATE_JSON_DOCUMENT, () =>
-      executeJsonToDartCommand(JsonFileKind.document, { analyzer })
+    vscode.commands.registerCommand(
+      COMMAND_GENERATE_JSON_DOCUMENT.command,
+      () => executeJsonToDartCommand(JsonFileKind.document, { analyzer })
     )
   );
 
+  /// JSON
+  const jsonDiagnostics =
+    vscode.languages.createDiagnosticCollection("dart-fixer-json");
+  context.subscriptions.push(jsonDiagnostics);
+  const jsonCodeActions = new JsonTypeDefinitionDartCodeActionProvider(
+    jsonDiagnostics,
+    analyzer
+  );
+  jsonCodeActions.subscribeToDocumentChanges(context);
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
-      { language: "json", scheme: "file", pattern: "**/*.jtd.json" },
-      new JsonTypeDefinitionDartCodeActionProvider(fixerDiagnostics, analyzer),
+      { scheme: "file", pattern: "**/*.{json,dart}" },
+      jsonCodeActions,
       JsonTypeDefinitionDartCodeActionProvider.metadata
     )
+  );
+
+  /// Pubspec and config watchers
+  const watcher = vscode.workspace.createFileSystemWatcher("**/pubspec.yaml");
+  const onChangePubspec = async (
+    uri: vscode.Uri,
+    opts?: { deleted: boolean }
+  ): Promise<void> => {
+    const deleted = opts?.deleted ?? false;
+    if (deleted) {
+      // TODO:
+    } else {
+      try {
+        const document = await vscode.workspace.openTextDocument(uri);
+        const data = parsePubspec(document.getText());
+        if (!data) {
+          return;
+        }
+        await analyzer.updatePubspec(pathFromUri(uri), data);
+        // TODO: get info from multiple pubspec
+        await jsonCodeActions.updateConfig(data.dart_fixer);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
+  context.subscriptions.push(
+    watcher,
+    watcher.onDidChange(onChangePubspec),
+    watcher.onDidCreate(onChangePubspec),
+    watcher.onDidDelete((uri) => onChangePubspec(uri, { deleted: true }))
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async () => {
+      const c = getExtensionConfig();
+      analyzer.updateConfig(getDefaultGeneratorConfig(c));
+      await jsonCodeActions.updateConfig(c);
+    })
   );
 
   // The command has been defined in the package.json file
@@ -226,7 +289,7 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
       }
     }
 
-    if (result.didChange) {
+    if (diagnostics.length > 0 || this.diagnosticCollection.has(document.uri)) {
       this.diagnosticCollection.set(document.uri, diagnostics);
     }
     return actions;
