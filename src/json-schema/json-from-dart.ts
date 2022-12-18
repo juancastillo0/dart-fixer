@@ -1,30 +1,12 @@
-import {
-  DartClass,
-  DartDefKind,
-  DartEnum,
-  DartField,
-  DartMetadata,
-  DartType,
-} from "../parser";
+import { JsonTypeDartSpec } from "../json-type-definition/json-from-dart";
+import { DartDefKind, DartField, DartMetadata, DartType } from "../parser";
 import { JSONSchemaType, Known, Nullable } from "./schema-type";
-
-type JsonTypeDartSpec =
-  | DartClass
-  | DartEnum
-  | string
-  | {
-      unionName: string;
-      discriminatorKey?: string;
-      variants: Record<string, DartClass> | Map<string, DartClass>;
-      annotations?: Array<DartMetadata> | null;
-      comment?: string | null;
-    };
 
 type JSONSchemaT =
   | (JSONSchemaType<Known> | { $ref: string } | object) &
       Partial<Nullable<unknown>> & { $schema?: string };
 
-export class JsonTypeDefFromDart {
+export class JsonSchemaFromDart {
   constructor(public allTypes: Map<string, JsonTypeDartSpec>) {}
 
   generateAll = (rootType?: JsonTypeDartSpec): JSONSchemaT => {
@@ -183,7 +165,7 @@ const addDartMetadataToJson = (
   //     _json.metadata ??= {};
   //     _json.metadata["comment"] = dartDef.comment;
   //   }
-  if (dartDef.annotations) {
+  if (dartDef.annotations && dartDef.annotations.length > 0) {
     _json.metadata ??= {};
     _json.metadata["annotations"] = dartDef.annotations.map(
       (annotation) => annotation.qualifiedName + (annotation.args ?? "")

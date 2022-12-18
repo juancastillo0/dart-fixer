@@ -8,7 +8,7 @@ import {
 } from "../parser";
 import { SomeJTDSchemaType } from "./schema-type";
 
-type JsonTypeDartSpec =
+export type JsonTypeDartSpec =
   | DartClass
   | DartEnum
   | string
@@ -142,7 +142,7 @@ const addDartMetadataToJson = (
     json.metadata ??= {};
     json.metadata["comment"] = dartDef.comment;
   }
-  if (dartDef.annotations) {
+  if (dartDef.annotations && dartDef.annotations.length > 0) {
     json.metadata ??= {};
     json.metadata["annotations"] = dartDef.annotations.map(
       (annotation) => annotation.qualifiedName + (annotation.args ?? "")
