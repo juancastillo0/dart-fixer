@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "definitions": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "nullable": true },
+        "id": { "type": "integer", "nullable": true },
+        "values3": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["values3"]
+    },
+    "UserBuilder": {
+      "type": "object",
+      "properties": {
+        "nameIsSet": { "type": "boolean" },
+        "_name": { "type": "string", "nullable": true },
+        "idIsSet": { "type": "boolean" },
+        "_id": { "type": "integer", "nullable": true },
+        "values3IsSet": { "type": "boolean" },
+        "_values3": {
+          "type": "array",
+          "items": { "type": "string" },
+          "nullable": true
+        }
+      },
+      "required": ["nameIsSet", "idIsSet", "values3IsSet"]
+    },
+    "UserFields": { "type": "string", "enum": ["name", "id", "values3"] }
+  },
+  "metadata": {
+    "dartFixer": {
+      "sourceDartFile": "/Users/juanmanuelcastillo/Desktop/flutter/dart-fixer/test_workspace/lib/models/input/user.dart",
+      "md5Hash": "l1kZap0aFxPw697MKcyL1w==",
+      "outputKind": "schema"
+    }
+  }
+}
