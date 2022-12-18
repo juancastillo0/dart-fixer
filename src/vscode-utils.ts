@@ -43,3 +43,30 @@ export const createOutOfDateDiagnostic = (
 };
 
 export const pathFromUri = (uri: vscode.Uri): Path => uri.path;
+
+export function subscribeToDocumentChanges(
+  context: vscode.ExtensionContext,
+  refreshDiagnostics: (document: vscode.TextDocument) => unknown
+): void {
+  if (vscode.window.activeTextEditor) {
+    refreshDiagnostics(vscode.window.activeTextEditor.document);
+  }
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) {
+        refreshDiagnostics(editor.document);
+      }
+    })
+  );
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e) =>
+      refreshDiagnostics(e.document)
+    )
+  );
+
+  // context.subscriptions.push(
+  //   vscode.workspace.onDidCloseTextDocument((doc) =>
+  //     this.collection.delete(doc.uri)
+  //   )
+  // );
+}

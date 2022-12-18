@@ -1,7 +1,11 @@
 import * as vscode from "vscode";
 import { DartAnalyzer } from "../analyzer";
 import { LexerComment } from "../parser";
-import { pathFromUri, textDocumentFromVsCode } from "../vscode-utils";
+import {
+  pathFromUri,
+  subscribeToDocumentChanges,
+  textDocumentFromVsCode,
+} from "../vscode-utils";
 import {
   CommentSection,
   dartCommentSections,
@@ -435,30 +439,9 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
   }
 
   subscribeToDocumentChanges(context: vscode.ExtensionContext): void {
-    if (vscode.window.activeTextEditor) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      this.refreshDiagnostics(vscode.window.activeTextEditor.document);
-    }
-    context.subscriptions.push(
-      vscode.window.onDidChangeActiveTextEditor((editor) => {
-        if (editor) {
-          return this.refreshDiagnostics(editor.document);
-        }
-        return;
-      })
+    subscribeToDocumentChanges(context, (document) =>
+      this.refreshDiagnostics(document)
     );
-
-    context.subscriptions.push(
-      vscode.workspace.onDidChangeTextDocument((e) =>
-        this.refreshDiagnostics(e.document)
-      )
-    );
-
-    // context.subscriptions.push(
-    //   vscode.workspace.onDidCloseTextDocument((doc) =>
-    //     this.collection.delete(doc.uri)
-    //   )
-    // );
   }
 }
 
