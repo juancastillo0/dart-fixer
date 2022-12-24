@@ -9,7 +9,7 @@
     - [fromJson factory](#fromjson-factory)
     - [toJson method](#tojson-method)
     - [equality operator and hashCode getter](#equality-operator-and-hashcode-getter)
-    - [copyWith getter](#copywith-getter)
+    - [copyWith method](#copywith-method)
     - [allFields getter](#allfields-getter)
     - [field enum](#field-enum)
     - [builder class](#builder-class)
@@ -24,7 +24,6 @@
   - [Test Extension](#test-extension)
     - [Test Workspace](#test-workspace)
   - [Following extension guidelines](#following-extension-guidelines)
-  - [Working with Markdown](#working-with-markdown)
   - [For more information](#for-more-information)
 
 # dart-fixer
@@ -131,7 +130,7 @@ Generates a `Model.fromJson(Map json)` factory inside the class. The parameter t
 
 ### toJson method
 
-Generates a `Map<String, Object?> toJson()` method that returns a json dart `Map`.
+Generates a `Map<String, Object?> toJson()` method that returns a dart `Map<String, Object?>` with json values.
 
 ### equality operator and hashCode getter
 
@@ -139,7 +138,7 @@ Generates a `Map<String, Object?> toJson()` method that returns a json dart `Map
 
 Generates a `bool operator ==(Object other)` and `int get hashCode` overrides for dart equality checks.
 
-### copyWith getter
+### copyWith method
 
 Generates a `Model copyWith({FieldType? fieldName, ...})` method that returns a new instance of the class with the fields overridden with the values passed as argument.
 
@@ -176,8 +175,6 @@ Calling out known issues can help limit users opening duplicate issues against y
 
 # Release Notes
 
-Users appreciate release notes as you update your extension.
-
 ## 1.0.0
 
 Initial release of ...
@@ -188,31 +185,36 @@ Added features X, Y, and Z.
 
 # Contributing
 
+Install the packages
+
 ```bash
 npm i
 ```
 
 ## Linting
 
+We use ESLint for static analysis of the code. You may want to install the [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) extension for vscode.
+
 ## Run Extension
+
+You may run the `Run Extension` vscode task in the `launch.json` configuration. This will open a new window with the extension set up. If you make changes to the extension source code, you will need to reload the opened Extension Development Host vscode window for it to use the new source code.
 
 ## Test Extension
 
+You may run the vscode tasks in the `launch.json` configuration.
+
+- `Extension Test` for the extension integration tests
+- `mocha test` for tests that do not require the vscode library to run
+
 ### Test Workspace
+
+There is a test workspace in the [test_workspace](./test_workspace/) directory featuring a Dart package with some use cases for the extension. You may run the extension and test the features manually by opening this folder in the new Extension Development Host vscode window.
 
 ## Following extension guidelines
 
 Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
 
 * [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
 
 ## For more information
 
