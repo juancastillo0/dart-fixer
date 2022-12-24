@@ -570,6 +570,7 @@ export interface DartFieldData {
   comment: string | null;
   annotations: Array<DartMetadata>;
   bracket: BracketWithOriginal | null;
+  isLate: boolean;
 }
 
 export class DartField implements DartFieldOrParam, DartDefBase {
@@ -578,6 +579,7 @@ export class DartField implements DartFieldOrParam, DartDefBase {
   }
   isStatic: boolean;
   isFinal: boolean;
+  isLate: boolean;
   name: string;
   isVariable: boolean;
   type: string | null;
@@ -599,6 +601,7 @@ export class DartField implements DartFieldOrParam, DartDefBase {
     this.parentType = parentType;
     this.isStatic = params.isStatic ?? false;
     this.isFinal = params.isFinal;
+    this.isLate = params.isLate ?? false;
     this.name = params.name;
     this.isVariable = params.isVariable;
     this.type = params.type;

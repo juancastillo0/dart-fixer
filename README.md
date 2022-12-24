@@ -10,6 +10,7 @@
     - [toJson method](#tojson-method)
     - [equality operator and hashCode getter](#equality-operator-and-hashcode-getter)
     - [copyWith method](#copywith-method)
+    - [toString method](#tostring-method)
     - [allFields getter](#allfields-getter)
     - [field enum](#field-enum)
     - [builder class](#builder-class)
@@ -141,6 +142,10 @@ Generates a `bool operator ==(Object other)` and `int get hashCode` overrides fo
 ### copyWith method
 
 Generates a `Model copyWith({FieldType? fieldName, ...})` method that returns a new instance of the class with the fields overridden with the values passed as argument.
+
+### toString method
+
+Generates a `String toString()` method override that returns a String with all the field values.
 
 ### allFields getter
 

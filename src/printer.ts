@@ -23,43 +23,99 @@ export interface GenerationOptions {
     /** The parameter type for the constructor.
      * @default "Map" */
     parameterType?: "Object?" | "dynamic" | "Map" | "Map<String, Object?>";
+    /** You may put Dart comments or annotations for the factory */
+    metadata?: string;
   };
   /** Generates a `Map<String, Object?> toJson()` method that
    * returns a dart `Map<String, Object?>` with json values. */
   toJson?: {
     /** Whether call the `toJson` method for nested values. */
     nested?: boolean;
+    /** You may put Dart comments or annotations for the method */
+    metadata?: string;
   };
   /** Generates a `bool operator ==(Object other)` and `int get hashCode` overrides
    * for dart equality checks. */
   equality?: {
-    /** Wether to use package:collections' DeepEquality.equals,
-     * instead of Dart's `==` operator for the comparison of the fields. */
+    /** Whether to use a custom equals method instead of Dart's `==` operator for
+     * the comparison of the fields.
+     * For example, if using `package:collection` you could set it
+     * to "const DeepCollectionEquality().equals" for deep equality */
+    equalsMethod?: string;
+    /** Whether to use a custom hash method instead of Dart's `.hashCode` getter for
+     * the hashCode of the class.
+     * For example, if using `package:collection` you could set it
+     * to "const DeepCollectionEquality().hash" for deep equality */
+    hashMethod?: string;
+    /** A custom import for the `equalsMethod`.
+     * For example, if using `import "package:collection:collection.dart";` for deep equality */
+    customImport?: string;
+    /** Whether to use `package:collection`'s deep equality methods */
     deep?: boolean;
-    // TODO: separate
-    /** Whether to generate a `String toString()` method. */
-    toStringGetters?: boolean;
   };
-  /** Generates a `List<Object?> get allFields` getter that returns the values for all fields. */
+  /** Generates a `Model copyWith(...fields)` method */
+  copyWith?: {
+    /** You may put Dart comments or annotations for the method */
+    metadata?: string;
+  };
+  /** Generates a `String toString()` method override that returns a String
+   * with all the field values. */
+  toStringOverride?: {
+    /** You may put Dart comments or annotations for the method */
+    metadata?: string;
+  };
+  /** Generates a `List<Object?> get props` getter that returns the values for all fields. */
   allFieldsGetter?: {
-    /** The name of the getter
-     * @default "allFields" */
+    /** The name of the getter.
+     * @default "props" */
     name?: string;
+    /** You may put Dart comments or annotations for the getter */
+    metadata?: string;
   };
   /** Generates a `enum ModelField` with all the fields in the class.
    * The enum contains multiple fields and methods that have information about the field and its type. */
   allFieldsEnum?: {
-    /** The suffix for the name of the Fields enum. Will be `Model${suffix}`.
-     * @default "Field" */
-    suffix?: string;
+    /** The name for the Fields enum. You may use "{{name}}" as a variable inside the template
+     * that will be replaced with the name of the model.
+     * @default "{{name}}Field" */
+    nameTemplate?: string;
+    /** You may put Dart comments or annotations for the enum */
+    metadata?: string;
   };
   /** Generates a `class ModelBuilder` with utilities for editing and setting fields and
-   * creating new instances of the Model from the values. Can be used to create instances of `Model`,
-   * it's an alternative to the `copyWith` method. */
+   * creating new instances of the Model from the values. Can be used to create instances of `Model`.
+   * It's an alternative to the `copyWith` method. */
   builder?: {
-    /** The suffix for the name of the Builder class. Will be `Model${suffix}`.
-     * @default "Builder" */
-    suffix?: string;
+    /** The name for the Builder class. You may use "{{name}}" as a variable inside the template
+     * that will be replaced with the name of the model.
+     * @default "{{name}}Builder" */
+    nameTemplate?: string;
+    /** You may put Dart comments or annotations for the class */
+    metadata?: string;
+  };
+  /** Generates a `class ModelObservable` with utilities for subscribing to changes in a mutable
+   * model creating new instances of the Model from the values. Can be used to create instances of `Model`.
+   * Can be used with the mobx library's `Observable` or with Flutter's `ValueNotifier`. */
+  observable?: {
+    /** The name for the Observable class. You may use "{{name}}" as a variable inside the template
+     * that will be replaced with the name of the model.
+     * @default "{{name}}Observable" */
+    nameTemplate?: string;
+    /** The name of the reactivity class for example.
+     * For example "Observable" for mobx. */
+    reactivityClass: string;
+    /** Whether to use custom reactivity classes for collections.
+     * For example, mobx's ObservableList, ObservableMap and ObservableSet.
+     * @default true */
+    // TODO: implement GenerationOptions.observable.collectionsReactivityClass
+    collectionsReactivityClass?: boolean;
+    /** Whether to pass `this`, the observable instance, to the constructor of the reactivity class
+     * @default false */
+    passThisToConstructor?: boolean;
+    /** An import needed to use the reactivity class */
+    customImport: string;
+    /** You may put Dart comments or annotations for the class */
+    metadata?: string;
   };
 }
 
@@ -81,6 +137,8 @@ const defaultGenerationOptions: GenerationOptions = {
   fromJson: {},
   toJson: {},
   equality: {},
+  copyWith: {},
+  toStringOverride: {},
   allFieldsGetter: {},
   allFieldsEnum: {},
   builder: {},
@@ -104,7 +162,9 @@ export class ClassGenerator {
     }
   }
 
-  generate = (dartClass: DartClass): { content: string; md5Hash: string } => {
+  generate = (
+    dartClass: DartClass
+  ): { content: string; md5Hash: string; imports: Array<string> } => {
     const options = this.options;
     const defaultConstructor =
       dartClass.defaultConstructor ?? makeConstructorFromFields(dartClass);
@@ -113,8 +173,10 @@ export class ClassGenerator {
   ${options.fromJson ? this.generateFromJson(defaultConstructor) : ""}\
   ${options.toJson ? this.generateToJson(dartClass.fieldsNotStatic) : ""}\
   ${
-    options.equality ? this.generateEquality(dartClass, defaultConstructor) : ""
+    options.copyWith ? this.generateCopyWith(dartClass, defaultConstructor) : ""
   }\
+  ${options.equality ? this.generateEquality(dartClass) : ""}\
+  ${options.toStringOverride ? this.generateToString(dartClass) : ""}\
   ${
     options.allFieldsGetter
       ? this.generateAllFieldsGetter(dartClass.fieldsNotStatic)
@@ -139,8 +201,14 @@ ${generatedConstructor}\
 ${output}
 // generated-dart-fixer-end${data}
 `;
+    const imports = [
+      options.equality?.customImport,
+      options.observable?.customImport,
+    ]
+      .filter((v) => typeof v === "string")
+      .sort() as Array<string>;
 
-    return { content, md5Hash };
+    return { content, md5Hash, imports };
   };
 
   generateFromJson = (dartConstructor: DartConstructorSpec): string => {
@@ -151,6 +219,7 @@ ${output}
       parameterType === "Map" || parameterType.trim().startsWith("Map<");
     const factoryName = `${dartConstructor.dartType.name}.${name}`;
     return `
+${options.fromJson?.metadata ?? ""}\
 factory ${factoryName}(${parameterType}${isMap ? " " : " _"}json) {
 ${isMap ? "" : "  final json = _json as Map;\n"}\
   return ${instantiateConstructor(
@@ -260,6 +329,7 @@ ${isMap ? "" : "  final json = _json as Map;\n"}\
 
   generateToJson = (fieldsNotStatic: Array<DartField>): string => {
     return `
+${this.options.toJson?.metadata ?? ""}\
 Map<String, Object${question}> toJson() {
   return {
     ${fieldsNotStatic
@@ -305,14 +375,18 @@ Map<String, Object${question}> toJson() {
     } else if (dartType.isBigInt) {
       return `${getter}.toString()`;
     }
+    if (this.options.toJson?.nested) {
+      return `${f.name}.toJson()`;
+    }
     return f.name;
   };
 
-  generateEquality = (
+  generateCopyWith = (
     dartClass: DartClass,
     dartConstructor: DartConstructorSpec
   ): string => {
     return `
+${this.options.copyWith?.metadata ?? ""}\
 ${dartClass.name} copyWith({
   ${dartConstructor.params
     .map(
@@ -338,14 +412,30 @@ ${dartClass.name} copyWith({
     }
   )};
 }
+`;
+  };
 
+  generateEquality = (dartClass: DartClass): string => {
+    const options = this.options.equality;
+    const equalsMethod =
+      options?.equalsMethod ??
+      (options?.deep ? "const DeepCollectionEquality().equals" : undefined);
+    const hashMethod =
+      options?.hashMethod ??
+      (options?.deep ? "const DeepCollectionEquality().hash" : undefined);
+
+    return `
 @override
 bool operator ==(Object other) {
   return identical(other, this) || other is ${
     dartClass.name
   } && other.runtimeType == runtimeType
   ${dartClass.fieldsNotStatic
-    .map((p) => ` && other.${p.name} == ${p.name}`)
+    .map((p) =>
+      equalsMethod
+        ? ` && ${equalsMethod}(other.${p.name}, ${p.name})`
+        : ` && other.${p.name} == ${p.name}`
+    )
     .join("")};
 }
 
@@ -353,10 +443,17 @@ bool operator ==(Object other) {
 int get hashCode {
   return Object.hashAll([
     runtimeType,
-    ${dartClass.fieldsNotStatic.map((p) => `${p.name},`).join("\n    ")}
+    ${dartClass.fieldsNotStatic
+      .map((p) => (hashMethod ? `${hashMethod}(${p.name}),` : `${p.name},`))
+      .join("\n    ")}
   ]);
 }
+`;
+  };
 
+  generateToString = (dartClass: DartClass): string => {
+    return `
+${this.options.toStringOverride?.metadata ?? ""}\
 @override
 String toString() {
   return "${dartClass.name}\${{${dartClass.fieldsNotStatic
@@ -367,8 +464,10 @@ String toString() {
   };
 
   generateAllFieldsGetter = (fieldsNotStatic: Array<DartField>): string => {
+    const name = this.options.allFieldsGetter?.name ?? "props";
     return `
-List<Object${question}> get allFields => [
+${this.options.allFieldsGetter?.metadata ?? ""}\
+List<Object${question}> get ${name} => [
   ${fieldsNotStatic.map((p) => `${p.name},`).join("\n  ")}
 ];
 `;
@@ -376,8 +475,11 @@ List<Object${question}> get allFields => [
 
   generateAllFieldsEnum = (dartClass: DartClass): string => {
     const className = dartClass.name;
+    const nameTemplate =
+      this.options.allFieldsEnum?.nameTemplate ?? "{{name}}Field";
     return `
-enum ${className}Fields {
+${this.options.allFieldsEnum?.metadata ?? ""}\
+enum ${nameTemplate.replace(/{{name}}/g, className)} {
   ${dartClass.fieldsNotStatic
     .map(
       (p) =>
@@ -412,20 +514,36 @@ enum ${className}Fields {
   };
 
   generateObservable = (dartClass: DartClass): DartClass => {
-    const obs = "Observable";
+    const obs = this.options.observable?.reactivityClass ?? "Observable";
+    const observableName = (
+      this.options.observable?.nameTemplate ?? "{{name}}Observable"
+    ).replace(/{{name}}/g, dartClass.name);
+
     const newClass = new DartClass({
       bracket: null,
-      name: `${dartClass.name}${obs}`,
+      name: observableName,
+      comment: this.options.observable?.metadata,
     });
     const defaultConstructor = makeConstructorFromFields(newClass);
     defaultConstructor.params.forEach((p) => (p.isThis = false));
     defaultConstructor.isConst = false;
-    defaultConstructor.body = `\
+    const passThisToConstructor =
+      this.options.observable?.passThisToConstructor ?? false;
+    if (passThisToConstructor) {
+      defaultConstructor.body = `{
+  ${dartClass.fieldsNotStatic
+    // TODO: use f.defaultValue
+    .map((f) => `_${f.name} = ${obs}(this, ${f.name});`)
+    .join("\n  ")}
+}`;
+    } else {
+      defaultConstructor.body = `\
 :${dartClass.fieldsNotStatic
-      // TODO: use f.defaultValue
-      .map((f) => `_${f.name} = ${obs}(${f.name})`)
-      .join(",")};
+        // TODO: use f.defaultValue
+        .map((f) => `_${f.name} = ${obs}(${f.name})`)
+        .join(",")};
 `;
+    }
     newClass.constructors.push(defaultConstructor);
 
     newClass.fields.push(
@@ -438,6 +556,7 @@ enum ${className}Fields {
               type: `${obs}<${f.type ?? `Object${question}`}>`,
               isFinal: true,
               isVariable: false,
+              isLate: passThisToConstructor,
             },
             newClass
           )
@@ -497,12 +616,16 @@ enum ${className}Fields {
     if (fields.length === 0) {
       return "";
     }
-    const className = `${dartClass.name}Builder`;
+    const nameTemplate =
+      this.options.builder?.nameTemplate ?? "{{name}}Builder";
+    const className = `${nameTemplate.replace(/{{name}}/g, dartClass.name)}`;
     const requiredFields = fields.filter(
       (p) => p.type && !p.type.trim().endsWith("?")
     );
     const noRequired = requiredFields.length === 0;
+
     return `
+${this.options.builder?.metadata ?? ""}\
 class ${className} {
   ${fields
     .map((p) => {

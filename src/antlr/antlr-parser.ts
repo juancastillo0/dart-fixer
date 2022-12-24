@@ -1197,6 +1197,7 @@ function mapField(
     isStatic: dec instanceof DeclarationContext && !!dec.STATIC(),
     isFinal: !!(dec.FINAL() ?? dec.finalVarOrType()?.FINAL()),
     isVariable: !!(dec.varOrType() ?? dec.finalVarOrType()?.varOrType())?.VAR(),
+    isLate: !!dec.LATE(),
     type: getTypeString(
       ctx,
       dec.type() ?? dec.finalVarOrType()?.type() ?? dec.varOrType()?.type()
