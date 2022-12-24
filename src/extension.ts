@@ -10,7 +10,7 @@ import {
   executeJsonToDartCommand,
   JsonTypeDefinitionDartCodeActionProvider,
 } from "./json-type-definition/vscode-json-edit";
-import { generate } from "./printer";
+import { ClassGenerator } from "./printer";
 import {
   createOutOfDateDiagnostic,
   pathFromUri,
@@ -256,10 +256,11 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
         "Generate Class Helpers",
         vscode.CodeActionKind.QuickFix
       );
-      const { content, md5Hash } = generate(dartClass, data.config ?? {}, {
+      const generator = new ClassGenerator(data.config ?? {}, {
         analyzer: this.analyzer,
         outputFile: pathFromUri(document.uri),
       });
+      const { content, md5Hash } = generator.generate(dartClass);
       let rangeToEdit = new vscode.Range(
         originalEnd.line,
         originalEnd.column,

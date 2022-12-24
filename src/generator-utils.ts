@@ -9,7 +9,7 @@ import {
   JsonSchemaCtx,
 } from "./json-type-definition/dart-from-json";
 import { SomeJTDSchemaType } from "./json-type-definition/schema-type";
-import { generate } from "./printer";
+import { ClassGenerator } from "./printer";
 import { createHash } from "crypto";
 
 export interface GeneratedSection {
@@ -158,6 +158,15 @@ const generateDartFileFromJsonData = (params: {
   const ctx = params.ctx;
   const printer = new DartModelPrinter();
   const classes = [...ctx.classes.values()];
+  const generator = new ClassGenerator(
+    // TODO: generator options
+    {},
+    params.analyzer && {
+      analyzer: params.analyzer,
+      outputFile: params.newFile,
+    }
+  );
+
   const dartFileText = `\
 ${[...ctx.imports.values()].join("\n")}\
 
@@ -168,14 +177,7 @@ ${classes
     classes[i].fields.length === 0
       ? c
       : `${c.substring(0, c.length - 1)}${
-          generate(
-            classes[i],
-            {},
-            params.analyzer && {
-              analyzer: params.analyzer,
-              outputFile: params.newFile,
-            }
-          ).content
+          generator.generate(classes[i]).content
         }`
   )
   .join("\n\n")}\

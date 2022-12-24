@@ -1,15 +1,7 @@
 import * as assert from "assert";
 import { Test } from "mocha";
 import { parseClassesAntlr } from "../antlr/antlr-parser";
-import {
-  generate,
-  generateAllFieldsEnum,
-  generateAllFieldsGetter,
-  generateBuilder,
-  generateEquality,
-  generateFromJson,
-  generateToJson,
-} from "../printer";
+import { ClassGenerator } from "../printer";
 
 export const testF = (name: string, func: () => unknown): Test => {
   return test(name, () => {
@@ -34,6 +26,8 @@ export const testF = (name: string, func: () => unknown): Test => {
 };
 
 suite("Printer Test Suite", () => {
+  const generator = new ClassGenerator({});
+
   const text = `
 class Model {
 final int? v;
@@ -57,7 +51,7 @@ final List<String>? params;
   const dartClass = values.classes[0];
 
   test("generateFromJson", () => {
-    const output = generateFromJson(dartClass.constructors[0]);
+    const output = generator.generateFromJson(dartClass.constructors[0]);
     assert.equal(
       output,
       `
@@ -73,7 +67,7 @@ factory Model.fromJson(Map json) {
   });
 
   test("generateToJson", () => {
-    const output = generateToJson(dartClass.fieldsNotStatic);
+    const output = generator.generateToJson(dartClass.fieldsNotStatic);
     assert.equal(
       output,
       `
@@ -89,7 +83,10 @@ Map<String, Object?> toJson() {
   });
 
   test("generateEquality", () => {
-    const output = generateEquality(dartClass, dartClass.defaultConstructor!);
+    const output = generator.generateEquality(
+      dartClass,
+      dartClass.defaultConstructor!
+    );
     assert.equal(
       output,
       `
@@ -130,7 +127,7 @@ String toString() {
   });
 
   test("generateAllFieldsGetter", () => {
-    const output = generateAllFieldsGetter(dartClass.fieldsNotStatic);
+    const output = generator.generateAllFieldsGetter(dartClass.fieldsNotStatic);
     assert.equal(
       output,
       `
@@ -144,7 +141,7 @@ List<Object?> get allFields => [
   });
 
   test("generateAllFieldsEnum", () => {
-    const output = generateAllFieldsEnum(dartClass);
+    const output = generator.generateAllFieldsEnum(dartClass);
     assert.equal(
       output,
       `
@@ -175,7 +172,10 @@ enum ModelFields {
   });
 
   test("generateBuilder", () => {
-    const output = generateBuilder(dartClass, dartClass.defaultConstructor!);
+    const output = generator.generateBuilder(
+      dartClass,
+      dartClass.defaultConstructor!
+    );
     assert.equal(
       output,
       `
@@ -257,7 +257,7 @@ class O {
   int e;
   Map<String, dynamic>? f;
 }`);
-    const { content } = generate(parsed.classes[0], {});
+    const { content } = generator.generate(parsed.classes[0]);
     assert.equal(
       content,
       `
