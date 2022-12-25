@@ -53,7 +53,7 @@ We support both types of schema, as input or output of the extension. For a disc
 
 ## Documentation and example snippet synchronization
 
-This extension provides a way to keep code or documentation snippets synchronized automatically. This may be useful if you want to use the same documentation from you code in a Markdown (`.md`) file or you may what to use your test code as an example snippet in your code documentation or README.
+This extension provides a way to keep code or documentation snippets synchronized automatically. This may be useful if you want to use the same documentation from you code in a Markdown (`.md`) file or you may what to use your test code as an example snippet in your code's documentation or README file (or any Markdown).
 
 ### Markdown and Dart Documentation Comments
 
@@ -73,7 +73,7 @@ Or inside Dart documentation comments:
 /// <!-- snippet-define-end:name -->
 ```
 
-And include the snippets with an `<!-- snippet-include:name -->` html comment in markdown files or documentation comments in Dart files:
+And include the snippets with an `<!-- snippet-include:name -->` html comment in Markdown files or in documentation comments in Dart files:
 
 ```dart
 /// <!-- snippet-include:name -->
@@ -111,9 +111,9 @@ which will be included within "\`\`\`dart" code section in the Markdown:
 
 ## Dart Model utilities generation
 
-Multiple utilities can be generated from dart classes. These include utilities for serialization and de-serialization (toJson and fromJson), data class or equality/immutable methods (copyWith, equality, hashCode, Builder class), other utilities such as a getter and an enum for all fields in the class.
+Multiple utilities can be generated from Dart classes. These include utilities for serialization and de-serialization (toJson and fromJson), data class or equality/immutable methods (copyWith, equality, hashCode, Builder class), other utilities such as an enum and getter for all fields in the class.
 
-When the generated code is out-of-date with the source code, the extension will show an error that can be fixed with a code action.
+When the generated code is out-of-date with the source code, the extension will show an error that can be fixed automatically with a code action.
 
 The generated sections will be wrapped around comments:
 
@@ -131,13 +131,11 @@ Generates a `Model.fromJson(Map json)` factory inside the class. The parameter t
 
 ### toJson method
 
-Generates a `Map<String, Object?> toJson()` method that returns a dart `Map<String, Object?>` with json values.
+Generates a `Map<String, Object?> toJson()` method that returns a Dart `Map<String, Object?>` with json values.
 
 ### equality operator and hashCode getter
 
-// TODO: use deepEquality
-
-Generates a `bool operator ==(Object other)` and `int get hashCode` overrides for dart equality checks.
+Generates a `bool operator ==(Object other)` and `int get hashCode` overrides for Dart equality checks.
 
 ### copyWith method
 
@@ -202,14 +200,15 @@ We use ESLint for static analysis of the code. You may want to install the [ESLi
 
 ## Run Extension
 
-You may run the `Run Extension` vscode task in the `launch.json` configuration. This will open a new window with the extension set up. If you make changes to the extension source code, you will need to reload the opened Extension Development Host vscode window for it to use the new source code.
+You may run the `Run Extension` vscode task in the `launch.json` configuration. This will open a new window with the extension set up. If you make changes to the extension source code, you will need to reload the opened Extension Development Host vscode window for it to use the new implementation.
 
 ## Test Extension
 
 You may run the vscode tasks in the `launch.json` configuration.
 
-- `Extension Test` for the extension integration tests
-- `mocha test` for tests that do not require the vscode library to run
+- `Extension Test` for the extension integration tests.
+- `mocha test` for tests that do not require the vscode library to run. 
+You may have to configure your node.js path with the `mochaExplorer.nodePath` if using the [Mocha Test Explorer extension](https://marketplace.visualstudio.com/items?itemName=hbenl.vscode-mocha-test-adapter).
 
 ### Test Workspace
 
