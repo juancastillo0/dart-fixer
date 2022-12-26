@@ -107,6 +107,11 @@ export class ParseCtx {
         this.comments[this.comments.length - 1] = {
           ...aggregation,
           text: aggregation.text + c.text,
+          end: {
+            index: c.index,
+            line: c.line,
+            column: c.column,
+          },
         };
       } else {
         this.comments.push({ ...c });
@@ -147,7 +152,13 @@ export class ParseCtx {
         : rule.startIndex;
     const found = binarySearch(this.comments, (a) => startIndex - a.index);
     const comment = found.item ?? this.comments[found.index];
-    if (!comment || !this.areNextToEachOther(comment.index, startIndex - 1)) {
+    if (
+      !comment ||
+      !this.areNextToEachOther(
+        comment.end?.index ?? comment.index,
+        startIndex - 1
+      )
+    ) {
       return null;
     }
     if (comment.kind === "multiline") {
@@ -300,20 +311,28 @@ export const parseClassesAntlr = (
             fields: [],
             methods: [],
             constructors: [],
-            entries: typeDef.enumEntry!.map<DartEnumEntry>((e) => ({
-              name: e.identifier()[e.identifier().length - 1].text,
-              generics: getIntervalText(
-                e.typeArguments() ?? e.argumentPart()?.typeArguments()
-              ),
-              arguments:
-                (e.arguments() ?? e.argumentPart()?.arguments())
-                  ?.argumentList()
-                  ?.argument()
-                  ?.map((a) => ({
-                    name: a.label()?.text?.replace(":", "") ?? null,
-                    value: getIntervalText(a.expression()),
-                  })) ?? [],
-            })),
+            entries: typeDef.enumEntry!.map((e) => {
+              const baseData = baseDataFromRule(
+                ctx,
+                e,
+                e.metadata().metadatum()
+              );
+              return new DartEnumEntry({
+                ...baseData,
+                name: e.identifier()[e.identifier().length - 1].text,
+                generics: getIntervalText(
+                  e.typeArguments() ?? e.argumentPart()?.typeArguments()
+                ),
+                arguments:
+                  (e.arguments() ?? e.argumentPart()?.arguments())
+                    ?.argumentList()
+                    ?.argument()
+                    ?.map((a) => ({
+                      name: a.label()?.text?.replace(":", "") ?? null,
+                      value: getIntervalText(a.expression()),
+                    })) ?? [],
+              });
+            }),
             interfaces: typeDef.interfaces?.map(getIntervalText) ?? [],
             mixins: typeDef.mixins?.map(getIntervalText) ?? [],
           });

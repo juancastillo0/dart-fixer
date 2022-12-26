@@ -3,6 +3,7 @@ import {
   BracketWithOriginal,
   CleanedText,
   getBrackets,
+  TextPosition,
 } from "./parser-utils";
 
 export interface LexerComment {
@@ -11,6 +12,7 @@ export interface LexerComment {
   line: number;
   index: number;
   column: number;
+  end?: TextPosition;
 }
 
 export interface DartParserConfig {
@@ -31,6 +33,7 @@ export enum DartDefKind {
   enum = "enum",
   extension = "extension",
   alias = "alias",
+  enumEntry = "enumEntry",
   function = "function",
   field = "field",
   constructor = "constructor",
@@ -415,10 +418,31 @@ export const toDartIdentifier = (entry: string): string => {
   return value.match(/^\d/) ? `$${value}` : value;
 };
 
-export interface DartEnumEntry {
+export class DartEnumEntry implements DartDefBase {
+  get kind(): DartDefKind.enumEntry {
+    return DartDefKind.enumEntry;
+  }
   name: string;
   generics: string | null;
   arguments: Array<DartArgument>;
+  comment: string | null;
+  annotations: Array<DartMetadata>;
+  bracket: BracketWithOriginal | null;
+
+  constructor(
+    params: Partial<DartEnumEntry> & {
+      name: string;
+      generics: string | null;
+      arguments: Array<DartArgument>;
+    }
+  ) {
+    this.name = params.name;
+    this.generics = params.generics;
+    this.arguments = params.arguments;
+    this.comment = params.comment ?? null;
+    this.annotations = params.annotations ?? [];
+    this.bracket = params.bracket ?? null;
+  }
 }
 
 export interface DartArgument {

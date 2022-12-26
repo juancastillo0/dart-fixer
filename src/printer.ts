@@ -150,14 +150,15 @@ interface GenerateAnalyzerParams {
 }
 
 export class ClassGenerator {
-  constructor(
-    public options: GenerationOptions,
-    public params?: GenerateAnalyzerParams
-  ) {
-    options = { ...options };
+  options: GenerationOptions;
+  params?: GenerateAnalyzerParams;
+
+  constructor(opts: GenerationOptions, params?: GenerateAnalyzerParams) {
+    this.params = params;
+    this.options = { ...opts };
     for (const [k, v] of Object.entries(defaultGenerationOptions)) {
-      if (!(k in options)) {
-        Object.assign(options, { [k]: v as object });
+      if (!(k in this.options)) {
+        Object.assign(this.options, { [k]: v as object });
       }
     }
   }
@@ -477,9 +478,11 @@ List<Object${question}> get ${name} => [
     const className = dartClass.name;
     const nameTemplate =
       this.options.allFieldsEnum?.nameTemplate ?? "{{name}}Field";
+    const enumName = nameTemplate.replace(/{{name}}/g, className);
+
     return `
 ${this.options.allFieldsEnum?.metadata ?? ""}\
-enum ${nameTemplate.replace(/{{name}}/g, className)} {
+enum ${enumName} {
   ${dartClass.fieldsNotStatic
     .map(
       (p) =>
@@ -501,14 +504,12 @@ enum ${nameTemplate.replace(/{{name}}/g, className)} {
   Object${question} get(${className} object) {
     switch (this) {
       ${dartClass.fieldsNotStatic
-        .map(
-          (p) => `case ${className}Fields.${p.name}: return object.${p.name};`
-        )
+        .map((p) => `case ${enumName}.${p.name}: return object.${p.name};`)
         .join("\n      ")}
     }
   }
 
-  const ${className}Fields(this.type, {${req} this.isFinal, ${req} this.isVariable, this.defaultValue,});
+  const ${enumName}(this.type, {${req} this.isFinal, ${req} this.isVariable, this.defaultValue,});
 }
 `;
   };

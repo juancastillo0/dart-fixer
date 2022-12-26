@@ -3,6 +3,7 @@ import {
   DartConstructor,
   DartConstructorParam,
   DartEnum,
+  DartEnumEntry,
   DartField,
   DartFunction,
   DartFunctionParam,
@@ -130,11 +131,14 @@ const dartClassFromJson = (
   } else if ("enum" in schema) {
     const enu = new DartEnum({
       name: customName,
-      entries: schema.enum.map((e) => ({
-        arguments: [],
-        generics: null,
-        name: toDartIdentifier(e),
-      })),
+      entries: schema.enum.map(
+        (e) =>
+          new DartEnumEntry({
+            arguments: [],
+            generics: null,
+            name: toDartIdentifier(e),
+          })
+      ),
     });
     // TODO: from json and to json
 

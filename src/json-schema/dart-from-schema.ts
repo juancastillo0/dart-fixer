@@ -399,18 +399,21 @@ const mapDartEnumFromJsonSchema = (
     )
   );
   dartEnum.entries.push(
-    ...enumValues.map<DartEnumEntry>((e) => ({
-      name: toDartIdentifier(`${e as string}`),
-      arguments: [
-        {
-          name: null,
-          value: `${
-            typeof e === "string" ? `"${e}"` : e?.toString() ?? "null"
-          }`,
-        },
-      ],
-      generics: null,
-    }))
+    ...enumValues.map(
+      (e) =>
+        new DartEnumEntry({
+          name: toDartIdentifier(`${e as string}`),
+          arguments: [
+            {
+              name: null,
+              value: `${
+                typeof e === "string" ? `"${e}"` : e?.toString() ?? "null"
+              }`,
+            },
+          ],
+          generics: null,
+        })
+    )
   );
 
   const fromJsonConstructor = new DartConstructor({
