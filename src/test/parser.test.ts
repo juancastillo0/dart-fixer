@@ -14,6 +14,7 @@ import {
   DartClass,
   DartTypeAlias,
   DartImport,
+  DartEnumEntry,
 } from "../parser";
 import { Bracket, getBrackets } from "../parser-utils";
 
@@ -259,7 +260,6 @@ class B extends Other {
   });
 
   suite("Dart Class", () => {
-    // TODO: mixins, interfaces
     const text = `
 class ///
  Name  {
@@ -582,16 +582,16 @@ enum OtherFields implements BaseClass {
         name: "E",
         comment: "/// enum E comment\n",
         entries: [
-          {
+          new DartEnumEntry({
             arguments: [],
             generics: null,
             name: "variant1",
-          },
-          {
+          }),
+          new DartEnumEntry({
             arguments: [],
             generics: null,
             name: "variant2",
-          },
+          }),
         ],
       },
       // TODO: test generics
@@ -721,7 +721,7 @@ enum OtherFields implements BaseClass {
           ),
         ],
         entries: [
-          {
+          new DartEnumEntry({
             generics: null,
             name: "md",
             arguments: [
@@ -738,8 +738,8 @@ enum OtherFields implements BaseClass {
                 value: `null`,
               },
             ],
-          },
-          {
+          }),
+          new DartEnumEntry({
             generics: null,
             name: "pos",
             arguments: [
@@ -756,7 +756,7 @@ enum OtherFields implements BaseClass {
                 value: `"default"`,
               },
             ],
-          },
+          }),
         ],
       },
     ];
@@ -813,7 +813,7 @@ class B extends Other {
 /*
  // str2 info
 */
-final str2 = '''
+late final str2 = '''
   String? func2() {
   }
 ''';
@@ -849,6 +849,7 @@ String func(G<B?> d) {
           name: "str",
           type: null,
           defaultValue: `'''\nString? func2() {\n}\n'''`,
+          isLate: false,
         },
         {
           ...defaultDataField,
@@ -858,6 +859,7 @@ String func(G<B?> d) {
           type: null,
           comment: "/*\n // str2 info\n*/",
           defaultValue: `'''\n  String? func2() {\n  }\n'''`,
+          isLate: true,
         },
       ]);
     });
@@ -871,12 +873,14 @@ String func(G<B?> d) {
         {
           ...defaultDataField,
           isFinal: true,
+          isLate: false,
           name: "v",
           type: "int?",
         },
         {
           ...defaultDataField,
           isFinal: true,
+          isLate: false,
           name: "value",
           type: "String",
           comment: "/* documentation multiline single */",
@@ -1026,7 +1030,8 @@ String func(G<B?> d) {
     ];
 
     methods.forEach((m, i) => {
-      test(`method ${m.name}`, () => {
+      const setOrGet = m.isGetter ? "get " : m.isSetter ? "set " : "";
+      test(`method ${setOrGet}${m.name}`, () => {
         assert.deepStrictEqual(removeMatch([bClass.methods[i]])[0], m);
       });
     });
@@ -1074,6 +1079,7 @@ String func(G<B?> d) {
 class B extends Other {
   final int? v;
   final String value;
+  static late var valueStaticVar;
 
   B({
     this.v = 3,
@@ -1122,6 +1128,7 @@ class B extends Other {
             {
               isStatic: false,
               isFinal: true,
+              isLate: false,
               name: "v",
               isVariable: false,
               type: "int?",
@@ -1133,9 +1140,22 @@ class B extends Other {
             {
               isStatic: false,
               isFinal: true,
+              isLate: false,
               name: "value",
               isVariable: false,
               type: "String",
+              defaultValue: null,
+              parentType: values.classes[0],
+              comment: null,
+              annotations: [],
+            },
+            {
+              isStatic: true,
+              isFinal: false,
+              isLate: true,
+              name: "valueStaticVar",
+              isVariable: true,
+              type: null,
               defaultValue: null,
               parentType: values.classes[0],
               comment: null,

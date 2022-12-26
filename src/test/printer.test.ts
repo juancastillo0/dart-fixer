@@ -82,8 +82,8 @@ Map<String, Object?> toJson() {
     );
   });
 
-  test("generateEquality", () => {
-    const output = generator.generateEquality(
+  test("generateCopyWith", () => {
+    const output = generator.generateCopyWith(
       dartClass,
       dartClass.defaultConstructor!
     );
@@ -101,7 +101,15 @@ Model copyWith({
     params: params ?? this.params,
   );
 }
+`
+    );
+  });
 
+  test("generateEquality", () => {
+    const output = generator.generateEquality(dartClass);
+    assert.equal(
+      output,
+      `
 @override
 bool operator ==(Object other) {
   return identical(other, this) || other is Model && other.runtimeType == runtimeType
@@ -117,7 +125,15 @@ int get hashCode {
     params,
   ]);
 }
+`
+    );
+  });
 
+  test("generateToString", () => {
+    const output = generator.generateToString(dartClass);
+    assert.equal(
+      output,
+      `
 @override
 String toString() {
   return "Model\${{"v":v,"value":value,"params":params,}}";
@@ -131,7 +147,7 @@ String toString() {
     assert.equal(
       output,
       `
-List<Object?> get allFields => [
+List<Object?> get props => [
   v,
   value,
   params,
@@ -145,7 +161,7 @@ List<Object?> get allFields => [
     assert.equal(
       output,
       `
-enum ModelFields {
+enum ModelField {
   v("int?", isFinal: true, isVariable: false, defaultValue: null,),
   value("String", isFinal: true, isVariable: false, defaultValue: null,),
   params("List<String>?", isFinal: true, isVariable: false, defaultValue: null,);
@@ -159,13 +175,13 @@ enum ModelFields {
 
   Object? get(Model object) {
     switch (this) {
-      case ModelFields.v: return object.v;
-      case ModelFields.value: return object.value;
-      case ModelFields.params: return object.params;
+      case ModelField.v: return object.v;
+      case ModelField.value: return object.value;
+      case ModelField.params: return object.params;
     }
   }
 
-  const ModelFields(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
+  const ModelField(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
 }
 `
     );
@@ -258,12 +274,12 @@ class O {
   Map<String, dynamic>? f;
 }`);
     const { content } = generator.generate(parsed.classes[0]);
-    assert.equal(
+    assertEqualStrings(
       content,
       `
 
 O({required this.a,this.b,required this.d,required this.c,required this.e,this.f,});
-// generated-dart-fixer-start{"md5Hash":"ZbPjUGj+ojwy5CEX/TDPDg=="}
+// generated-dart-fixer-start{"md5Hash":"bGkLbVi8h9mUw86kon29aw=="}
   
 factory O.fromJson(Map json) {
   return O(
@@ -304,7 +320,7 @@ O copyWith({
     f: f ?? (fToNull ? null : this.f),
   );
 }
-
+  
 @override
 bool operator ==(Object other) {
   return identical(other, this) || other is O && other.runtimeType == runtimeType
@@ -323,13 +339,13 @@ int get hashCode {
     f,
   ]);
 }
-
+  
 @override
 String toString() {
   return "O\${{"a":a,"b":b,"d":d,"c":c,"e":e,"f":f,}}";
 }
   
-List<Object?> get allFields => [
+List<Object?> get props => [
   a,
   b,
   d,
@@ -340,7 +356,7 @@ List<Object?> get allFields => [
 }
 
 
-enum OFields {
+enum OField {
   a("String", isFinal: true, isVariable: false, defaultValue: null,),
   b("int?", isFinal: true, isVariable: false, defaultValue: null,),
   d("", isFinal: true, isVariable: false, defaultValue: null,),
@@ -357,16 +373,16 @@ enum OFields {
 
   Object? get(O object) {
     switch (this) {
-      case OFields.a: return object.a;
-      case OFields.b: return object.b;
-      case OFields.d: return object.d;
-      case OFields.c: return object.c;
-      case OFields.e: return object.e;
-      case OFields.f: return object.f;
+      case OField.a: return object.a;
+      case OField.b: return object.b;
+      case OField.d: return object.d;
+      case OField.c: return object.c;
+      case OField.e: return object.e;
+      case OField.f: return object.f;
     }
   }
 
-  const OFields(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
+  const OField(this.type, {required this.isFinal, required this.isVariable, this.defaultValue,});
 }
 
 class OBuilder {
@@ -476,8 +492,25 @@ class OBuilder {
   OBuilder copyWith(OBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"ZbPjUGj+ojwy5CEX/TDPDg=="}
+// generated-dart-fixer-end{"md5Hash":"bGkLbVi8h9mUw86kon29aw=="}
 `
     );
   });
 });
+
+const assertEqualStrings = (actual: string, expected: string): void => {
+  const actualLines = actual.split(/\n/g);
+  const expectedLines = expected.split(/\n/g);
+  assert.deepEqual(
+    {
+      length: actual.length,
+      numLines: actualLines.length,
+      lines: actualLines,
+    },
+    {
+      length: expected.length,
+      numLines: expectedLines.length,
+      lines: expectedLines,
+    }
+  );
+};

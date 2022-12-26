@@ -65,9 +65,9 @@ export const getBrackets = (
     }
     let max = bracket.index + 1;
     while (max >= 0) {
-      const bracket = brackets[max];
-      if (bracket && bracket.start <= index && bracket.end! >= index) {
-        return bracket;
+      const b = brackets[max];
+      if (b && b.start <= index && b.end! >= index) {
+        return b;
       }
       max -= 1;
     }
@@ -186,7 +186,7 @@ export const cleanRawText = (
       delta = pattern.position > index ? 0 : pattern.cumulative;
     }
     const mappedIndex = delta + index;
-    const line = binarySearch(newLines, (index) => mappedIndex - index).index;
+    const line = binarySearch(newLines, (i) => mappedIndex - i).index;
     const column = mappedIndex - newLines[line] - 1;
     // TODO: maybe find a better way to find the first line "0, 0"
     // if (mappedIndex > newLines[0]) {
