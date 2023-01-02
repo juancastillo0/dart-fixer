@@ -13,6 +13,7 @@ import {
 import { ClassGenerator } from "./printer";
 import {
   createOutOfDateDiagnostic,
+  formatFiles,
   pathFromUri,
   textDocumentFromVsCode,
   VsCodeFileSystem,
@@ -34,6 +35,18 @@ export const COMMAND_GENERATE_JSON_DOCUMENT: vscode.Command = {
   command: `${EXTENSION_NAME}.dartModelFromJsonDocument`,
   title: "Dart Fixer: Dart Model from JSON Model Document",
   tooltip: "Generate Dart Model from JSON Model Document",
+};
+
+export const COMMAND_LINT_ALL: vscode.Command = {
+  command: `${EXTENSION_NAME}.findAllErrors`,
+  title: "Dart Fixer: Lint - Find source code errors",
+  tooltip: "Lint - Find source code errors",
+};
+
+export const COMMAND_FIX_ALL: vscode.Command = {
+  command: `${EXTENSION_NAME}.fixAllErrors`,
+  title: "Dart Fixer: Fix source code errors",
+  tooltip: "Fix source code errors",
 };
 
 const COMMAND_OBJECT: vscode.Command = {
@@ -64,10 +77,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const fixerDiagnostics =
     vscode.languages.createDiagnosticCollection("dart-fixer");
   context.subscriptions.push(fixerDiagnostics);
+  const dartFixerCodeActions = new DartCodeActionProvider(
+    fixerDiagnostics,
+    analyzer
+  );
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { language: "dart", scheme: "file" },
-      new DartCodeActionProvider(fixerDiagnostics, analyzer),
+      dartFixerCodeActions,
       DartCodeActionProvider.metadata
     )
   );
@@ -125,7 +142,32 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
+  /// Lint and fix all errors
+  const codeActionProviders = {
+    dartFixerCodeActions,
+    commentsCodeAction,
+    jsonCodeActions,
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMAND_LINT_ALL.command, () =>
+      executeLintAllCommand({
+        ...codeActionProviders,
+        fixAll: false,
+      })
+    )
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMAND_FIX_ALL.command, () =>
+      executeLintAllCommand({
+        ...codeActionProviders,
+        fixAll: true,
+      })
+    )
+  );
+
   /// Pubspec and config watchers
+  // TODO: custom dartfixer.{yaml,yml,json,jsonc}
   const watcher = vscode.workspace.createFileSystemWatcher("**/pubspec.yaml");
   const onChangePubspec = async (
     uri: vscode.Uri,
@@ -194,6 +236,75 @@ async function printDefinitionsForActiveEditor(): Promise<void> {
   );
   console.log(definitions);
 }
+
+const executeLintAllCommand = async (args: {
+  fixAll: boolean;
+  dartFixerCodeActions: DartCodeActionProvider;
+  commentsCodeAction: CommentsCodeActions;
+  jsonCodeActions: JsonTypeDefinitionDartCodeActionProvider;
+}): Promise<void> => {
+  const files = await vscode.workspace.findFiles("**/*.{json,dart,md,mdx}");
+  const allActions: Array<Array<vscode.CodeAction>> = [];
+  await Promise.all(
+    files.map(async (uri) => {
+      const file = await vscode.workspace.openTextDocument(uri);
+
+      const source = new vscode.CancellationTokenSource();
+      // all the document's range
+      const range = new vscode.Range(
+        new vscode.Position(0, 0),
+        file.positionAt(file.getText().length)
+      );
+      const codeActionContext: vscode.CodeActionContext = {
+        triggerKind: vscode.CodeActionTriggerKind.Invoke,
+        // TODO: set diagnostics
+        diagnostics: [],
+        only: vscode.CodeActionKind.SourceFixAll,
+      };
+      const actionsList = await Promise.all([
+        file.languageId === "markdown"
+          ? []
+          : args.jsonCodeActions.provideCodeActions(file),
+        file.languageId === "dart"
+          ? args.dartFixerCodeActions.provideCodeActions(
+              file,
+              range,
+              codeActionContext,
+              source.token
+            )
+          : [],
+        file.languageId === "json"
+          ? []
+          : args.commentsCodeAction.provideCodeActions(
+              file,
+              range,
+              codeActionContext,
+              source.token
+            ),
+      ]);
+      if (args.fixAll) {
+        allActions.push(...actionsList);
+      }
+    })
+  );
+  if (args.fixAll) {
+    const editedFiles = new Map<string, vscode.Uri>();
+    await Promise.all(
+      allActions
+        .flatMap((actions) => actions)
+        .map(async (action) => {
+          // TODO: command
+          if (action.edit && action.diagnostics?.length) {
+            action.edit
+              .entries()
+              .forEach(([uri]) => editedFiles.set(uri.toString(), uri));
+            await vscode.workspace.applyEdit(action.edit);
+          }
+        })
+    );
+    await formatFiles([...editedFiles.values()]);
+  }
+};
 
 class DartCodeActionProvider implements vscode.CodeActionProvider {
   constructor(
@@ -285,7 +396,7 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
       action.edit.replace(document.uri, rangeToEdit, content);
       action.isPreferred = true;
       // Only show action within a class
-      if (classRange.contains(range)) {
+      if (classRange.intersection(range)) {
         actions.push(action);
       }
     }

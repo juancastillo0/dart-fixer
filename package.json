@@ -15,7 +15,9 @@
     "onCommand:dart-fixer.helloWorld",
     "onCommand:dart-fixer.dartModelFromJTD",
     "onCommand:dart-fixer.dartModelFromJsonSchema",
-    "onCommand:dart-fixer.dartModelFromJsonDocument"
+    "onCommand:dart-fixer.dartModelFromJsonDocument",
+    "onCommand:dart-fixer.findAllErrors",
+    "onCommand:dart-fixer.fixAllErrors"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -35,6 +37,14 @@
       {
         "command": "dart-fixer.dartModelFromJsonDocument",
         "title": "Dart Fixer: Dart Model from JSON Model Document"
+      },
+      {
+        "command": "dart-fixer.findAllErrors",
+        "title": "Dart Fixer: Lint - Find source code errors"
+      },
+      {
+        "command": "dart-fixer.fixAllErrors",
+        "title": "Dart Fixer: Fix source code errors"
       }
     ],
     "menus": {
@@ -54,6 +64,12 @@
         {
           "command": "dart-fixer.dartModelFromJsonDocument",
           "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.findAllErrors"
+        },
+        {
+          "command": "dart-fixer.fixAllErrors"
         }
       ],
       "editor/context": [
@@ -72,6 +88,12 @@
         {
           "command": "dart-fixer.dartModelFromJsonDocument",
           "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.findAllErrors"
+        },
+        {
+          "command": "dart-fixer.fixAllErrors"
         }
       ]
     }

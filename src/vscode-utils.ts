@@ -70,3 +70,30 @@ export function subscribeToDocumentChanges(
   //   )
   // );
 }
+
+export const formatFiles = async (
+  uris: Array<vscode.Uri>
+): Promise<Array<vscode.WorkspaceEdit | undefined>> => {
+  return Promise.all(
+    uris.map(async (uri) => {
+      // https://code.visualstudio.com/api/references/commands
+      const edits: Array<vscode.TextEdit> | undefined =
+        await vscode.commands.executeCommand(
+          "vscode.executeFormatDocumentProvider",
+          uri,
+          {
+            // TODO:
+            tabSize: 2,
+            insertSpaces: true,
+          } as vscode.FormattingOptions
+        );
+      if (edits) {
+        const edit = new vscode.WorkspaceEdit();
+        edit.set(uri, edits);
+        await vscode.workspace.applyEdit(edit);
+        return edit;
+      }
+      return undefined;
+    })
+  );
+};
