@@ -67,6 +67,15 @@ export interface ParsedDartFileData {
   generatedSections: Map<string, GeneratedSection>;
 }
 
+type TextDocumentDataResult =
+  | { data: ParsedDartFileData; didChange: boolean; error?: undefined }
+  | { error: object };
+
+interface DocumentPromise {
+  document: TextDocument;
+  promise: Promise<TextDocumentDataResult>;
+}
+
 export class DartAnalyzer {
   constructor(
     globalConfig: GenerationOptions | undefined,
@@ -81,6 +90,7 @@ export class DartAnalyzer {
   pubSpecDataMap: Map<Path, PubSpecData> | undefined;
   // TODO: remove deleted files
   cache = new Map<string, ParsedDartFile>();
+  private _processing = new Map<string, DocumentPromise>();
 
   updateConfig = (globalConfig: GenerationOptions | undefined): void => {
     this.globalConfig = globalConfig;
@@ -214,12 +224,10 @@ export class DartAnalyzer {
     return undefined;
   }
 
+  // TODO: update files that import the given file
   getData = async (
     document: TextDocument // vscode.TextDocument
-  ): Promise<
-    | { data: ParsedDartFileData; didChange: boolean; error?: undefined }
-    | { error: object }
-  > => {
+  ): Promise<TextDocumentDataResult> => {
     if (!this.pubSpecDataMap) {
       this.pubSpecDataMap = await getDartPackageData(this.fsControl);
       // TODO:
@@ -241,9 +249,16 @@ export class DartAnalyzer {
     const previousData = this.cache.get(document.uri.toString());
 
     let data = previousData?.data;
-    if (data && previousData?.version === document.version) {
+    if (data && previousData!.version >= document.version) {
       return { didChange: false, data };
     }
+    const processing = this._processing.get(document.uri);
+    if (processing && processing.document.version >= document.version) {
+      return processing.promise;
+    }
+    let resolve: (r: TextDocumentDataResult) => void = () => undefined;
+    const promise = new Promise<TextDocumentDataResult>((r) => (resolve = r));
+    this._processing.set(document.uri, { document, promise });
     console.log("CHANGE");
 
     try {
@@ -257,24 +272,28 @@ export class DartAnalyzer {
         uri: document.uri,
         pubSpecUri: pubSpecDataE?.uri,
       });
-      for (const importItem of values.imports.filter((im) => im.isOwnPackage)) {
-        const uri = resolveUri({
-          fileUri: document.uri,
-          packageName,
-          rootDir,
-          importItem,
-        });
-        if (uri) {
-          console.log("uri ", uri);
-          try {
-            // TODO:
-            const importDoc = await this.fsControl.openTextDocument(uri);
-            await this.getData(importDoc);
-          } catch (error) {
-            console.error(error);
-          }
-        }
-      }
+      await Promise.all(
+        values.imports
+          .filter((im) => im.isOwnPackage)
+          .map(async (importItem) => {
+            const uri = resolveUri({
+              fileUri: document.uri,
+              packageName,
+              rootDir,
+              importItem,
+            });
+            if (uri && !this._processing.has(uri)) {
+              console.log("uri ", uri);
+              try {
+                // TODO:
+                const importDoc = await this.fsControl.openTextDocument(uri);
+                await this.getData(importDoc);
+              } catch (error) {
+                console.error(error);
+              }
+            }
+          })
+      );
       const generatedSections = getGeneratedSections(text, values.cleanText);
       data = {
         values,
@@ -290,10 +309,17 @@ export class DartAnalyzer {
         text,
         data,
       });
+      resolve({ didChange: true, data });
     } catch (error) {
       console.error(error);
-      return { error: error as object };
+      resolve({ error: error as object });
     }
-    return { didChange: true, data };
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    promise.then(() => {
+      if (this._processing.get(document.uri)?.document === document) {
+        this._processing.delete(document.uri);
+      }
+    });
+    return promise;
   };
 }
