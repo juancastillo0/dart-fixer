@@ -9,7 +9,7 @@ class User {
     required this.values3,
   });
 
-// generated-dart-fixer-start{"md5Hash":"X93ULCvZleKZw2Uu68j6Eg=="}
+// generated-dart-fixer-start{"md5Hash":"DSd3DIghQKlPr/qW+3hHhw=="}
 
   factory User.fromJson(Map json) {
     return User(
@@ -70,14 +70,14 @@ class User {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         name,
         id,
         values3,
       ];
 }
 
-enum UserFields {
+enum UserField {
   name(
     "String?",
     isFinal: true,
@@ -106,16 +106,16 @@ enum UserFields {
 
   Object? get(User object) {
     switch (this) {
-      case UserFields.name:
+      case UserField.name:
         return object.name;
-      case UserFields.id:
+      case UserField.id:
         return object.id;
-      case UserFields.values3:
+      case UserField.values3:
         return object.values3;
     }
   }
 
-  const UserFields(
+  const UserField(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -196,4 +196,4 @@ class UserBuilder {
   UserBuilder copyWith(UserBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"X93ULCvZleKZw2Uu68j6Eg=="}
+// generated-dart-fixer-end{"md5Hash":"DSd3DIghQKlPr/qW+3hHhw=="}

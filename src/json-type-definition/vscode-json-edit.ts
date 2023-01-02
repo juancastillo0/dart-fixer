@@ -282,7 +282,7 @@ const getGenerateDartFromJsonAction = async (
   const generated = await createDartModelFromJSON(
     {
       text: jsonDoc.getText(),
-      jsonFile: comment.from,
+      jsonFile: jsonDoc.uri,
       newFile: pathFromUri(document.uri),
     },
     comment.kind,

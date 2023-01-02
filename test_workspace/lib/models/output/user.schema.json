@@ -26,12 +26,12 @@
       },
       "required": ["nameIsSet", "idIsSet", "values3IsSet"]
     },
-    "UserFields": { "type": "string", "enum": ["name", "id", "values3"] }
+    "UserField": { "type": "string", "enum": ["name", "id", "values3"] }
   },
   "metadata": {
     "dartFixer": {
       "sourceDartFile": "/Users/juanmanuelcastillo/Desktop/flutter/dart-fixer/test_workspace/lib/models/input/user.dart",
-      "md5Hash": "l1kZap0aFxPw697MKcyL1w==",
+      "md5Hash": "RHC+bDWFt4XPJyRerF7Vug==",
       "outputKind": "schema"
     }
   }

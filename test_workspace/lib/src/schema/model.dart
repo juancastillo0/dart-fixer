@@ -1,4 +1,4 @@
-// generated-dart-fixer-json{"from":"./model.doc.json","kind":"document","md5Hash":"kWrIOsnLIDnOpalUoeQKBA=="}
+// generated-dart-fixer-json{"from":"./model.doc.json","kind":"document","md5Hash":"1duUUXi8YoWzs+G52uQNfA=="}
 
 class Model {
   final String name;
@@ -14,7 +14,8 @@ class Model {
     required this.listAny,
     required this.m,
   });
-// generated-dart-fixer-start{"md5Hash":"U1/XOLuOdueO5EhQ++x+RA=="}
+
+// generated-dart-fixer-start{"md5Hash":"5VlP3BA6IUBbynhq0sbE3w=="}
 
   factory Model.fromJson(Map json) {
     return Model(
@@ -87,7 +88,7 @@ class Model {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         name,
         value,
         list,
@@ -96,7 +97,7 @@ class Model {
       ];
 }
 
-enum ModelFields {
+enum ModelField {
   name(
     "String",
     isFinal: true,
@@ -137,20 +138,20 @@ enum ModelFields {
 
   Object? get(Model object) {
     switch (this) {
-      case ModelFields.name:
+      case ModelField.name:
         return object.name;
-      case ModelFields.value:
+      case ModelField.value:
         return object.value;
-      case ModelFields.list:
+      case ModelField.list:
         return object.list;
-      case ModelFields.listAny:
+      case ModelField.listAny:
         return object.listAny;
-      case ModelFields.m:
+      case ModelField.m:
         return object.m;
     }
   }
 
-  const ModelFields(
+  const ModelField(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -269,7 +270,7 @@ class ModelBuilder {
   ModelBuilder copyWith(ModelBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"U1/XOLuOdueO5EhQ++x+RA=="}
+// generated-dart-fixer-end{"md5Hash":"5VlP3BA6IUBbynhq0sbE3w=="}
 typedef M = Map<String, Object?>;
 
 typedef ListAny = Object?;

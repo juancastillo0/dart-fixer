@@ -1,4 +1,4 @@
-// generated from "./schema-1.jtd.json"
+// generated-dart-fixer-json{"from":"./schema-1.jtd.json","kind":"typeDefinition","md5Hash":"80mpHhPSdzZnZTZTZxI2DA=="}
 
 class Schema1 {
   final String id;
@@ -14,7 +14,7 @@ class Schema1 {
     this.isAdmin,
     this.op,
   });
-// generated-dart-fixer-start{"md5Hash":"h8hQcfTCDUaTgwzUoSYXxw=="}
+// generated-dart-fixer-start{"md5Hash":"8WqOkYUHNuGyHZzhBgONVw=="}
 
   factory Schema1.fromJson(Map json) {
     return Schema1(
@@ -89,7 +89,7 @@ class Schema1 {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         id,
         createdAt,
         karma,
@@ -98,7 +98,7 @@ class Schema1 {
       ];
 }
 
-enum Schema1Fields {
+enum Schema1Field {
   id(
     "String",
     isFinal: true,
@@ -139,20 +139,20 @@ enum Schema1Fields {
 
   Object? get(Schema1 object) {
     switch (this) {
-      case Schema1Fields.id:
+      case Schema1Field.id:
         return object.id;
-      case Schema1Fields.createdAt:
+      case Schema1Field.createdAt:
         return object.createdAt;
-      case Schema1Fields.karma:
+      case Schema1Field.karma:
         return object.karma;
-      case Schema1Fields.isAdmin:
+      case Schema1Field.isAdmin:
         return object.isAdmin;
-      case Schema1Fields.op:
+      case Schema1Field.op:
         return object.op;
     }
   }
 
-  const Schema1Fields(
+  const Schema1Field(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -267,5 +267,5 @@ class Schema1Builder {
   Schema1Builder copyWith(Schema1Builder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"h8hQcfTCDUaTgwzUoSYXxw=="}
+// generated-dart-fixer-end{"md5Hash":"8WqOkYUHNuGyHZzhBgONVw=="}
 

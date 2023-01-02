@@ -28,7 +28,8 @@ class Other {
     required this.po2,
     this.pos,
   });
-// generated-dart-fixer-start{"md5Hash":"mfnSPzw24h0O/pBs92rMYw=="}
+
+// generated-dart-fixer-start{"md5Hash":"i9bbI40s8FJk8QOG9VJSqA=="}
 
   factory Other.fromJson(Map json) {
     return Other(
@@ -88,14 +89,14 @@ class Other {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         md,
         po2,
         pos,
       ];
 }
 
-enum OtherFields {
+enum OtherField {
   md(
     "List",
     isFinal: true,
@@ -124,16 +125,16 @@ enum OtherFields {
 
   Object? get(Other object) {
     switch (this) {
-      case OtherFields.md:
+      case OtherField.md:
         return object.md;
-      case OtherFields.po2:
+      case OtherField.po2:
         return object.po2;
-      case OtherFields.pos:
+      case OtherField.pos:
         return object.pos;
     }
   }
 
-  const OtherFields(
+  const OtherField(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -214,4 +215,4 @@ class OtherBuilder {
   OtherBuilder copyWith(OtherBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"mfnSPzw24h0O/pBs92rMYw=="}
+// generated-dart-fixer-end{"md5Hash":"i9bbI40s8FJk8QOG9VJSqA=="}

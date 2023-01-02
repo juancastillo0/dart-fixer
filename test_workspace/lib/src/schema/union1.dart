@@ -1,4 +1,4 @@
-// generated from "./union1.jtd.json"
+// generated-dart-fixer-json{"from":"./union1.jtd.json","kind":"typeDefinition","md5Hash":"hYKIZ3FfnShNRQjvsWkqtA=="}
 
 class Union1One extends Union1 {
   final String id;
@@ -8,7 +8,7 @@ class Union1One extends Union1 {
     required this.id,
     required this.maps,
   });
-// generated-dart-fixer-start{"md5Hash":"vdsw9NXbQj7yTzd6oBRC6w=="}
+// generated-dart-fixer-start{"md5Hash":"jgmzt6PZJe9UcIsAMqgzDg=="}
 
   factory Union1One.fromJson(Map json) {
     return Union1One(
@@ -61,13 +61,13 @@ class Union1One extends Union1 {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         id,
         maps,
       ];
 }
 
-enum Union1OneFields {
+enum Union1OneField {
   id(
     "String",
     isFinal: true,
@@ -90,14 +90,14 @@ enum Union1OneFields {
 
   Object? get(Union1One object) {
     switch (this) {
-      case Union1OneFields.id:
+      case Union1OneField.id:
         return object.id;
-      case Union1OneFields.maps:
+      case Union1OneField.maps:
         return object.maps;
     }
   }
 
-  const Union1OneFields(
+  const Union1OneField(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -161,7 +161,7 @@ class Union1OneBuilder {
   Union1OneBuilder copyWith(Union1OneBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"vdsw9NXbQj7yTzd6oBRC6w=="}
+// generated-dart-fixer-end{"md5Hash":"jgmzt6PZJe9UcIsAMqgzDg=="}
 
 class Union1Two extends Union1 {
   final bool? isAdmin;
@@ -173,7 +173,7 @@ class Union1Two extends Union1 {
     this.op,
     this.list,
   });
-// generated-dart-fixer-start{"md5Hash":"KmzAVEe1V19dXGi8pS5fYQ=="}
+// generated-dart-fixer-start{"md5Hash":"+FiKQhm7tmgwzAr3Gd4DZQ=="}
 
   factory Union1Two.fromJson(Map json) {
     return Union1Two(
@@ -237,14 +237,14 @@ class Union1Two extends Union1 {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         isAdmin,
         op,
         list,
       ];
 }
 
-enum Union1TwoFields {
+enum Union1TwoField {
   isAdmin(
     "bool?",
     isFinal: true,
@@ -273,16 +273,16 @@ enum Union1TwoFields {
 
   Object? get(Union1Two object) {
     switch (this) {
-      case Union1TwoFields.isAdmin:
+      case Union1TwoField.isAdmin:
         return object.isAdmin;
-      case Union1TwoFields.op:
+      case Union1TwoField.op:
         return object.op;
-      case Union1TwoFields.list:
+      case Union1TwoField.list:
         return object.list;
     }
   }
 
-  const Union1TwoFields(
+  const Union1TwoField(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -360,7 +360,7 @@ class Union1TwoBuilder {
   Union1TwoBuilder copyWith(Union1TwoBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"KmzAVEe1V19dXGi8pS5fYQ=="}
+// generated-dart-fixer-end{"md5Hash":"+FiKQhm7tmgwzAr3Gd4DZQ=="}
 
 class Union1 {
   const Union1();

@@ -1,4 +1,4 @@
-// generated from "./draft.schema.json"
+// generated-dart-fixer-json{"from":"./draft.schema.json","kind":"schema","md5Hash":"ear09nRxyY2gKJNcL9beTw=="}
 
 class Other {
   final String? name;
@@ -8,7 +8,7 @@ class Other {
     this.name,
     this.friends,
   });
-// generated-dart-fixer-start{"md5Hash":"jUmQgcoQzQ9b3qzkrnqzMw=="}
+// generated-dart-fixer-start{"md5Hash":"MjWUEbyBnCTFnvZo3WzMFg=="}
 
   factory Other.fromJson(Map json) {
     return Other(
@@ -66,13 +66,13 @@ class Other {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         name,
         friends,
       ];
 }
 
-enum OtherFields {
+enum OtherField {
   name(
     "String?",
     isFinal: true,
@@ -95,14 +95,14 @@ enum OtherFields {
 
   Object? get(Other object) {
     switch (this) {
-      case OtherFields.name:
+      case OtherField.name:
         return object.name;
-      case OtherFields.friends:
+      case OtherField.friends:
         return object.friends;
     }
   }
 
-  const OtherFields(
+  const OtherField(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -163,7 +163,7 @@ class OtherBuilder {
   OtherBuilder copyWith(OtherBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"jUmQgcoQzQ9b3qzkrnqzMw=="}
+// generated-dart-fixer-end{"md5Hash":"MjWUEbyBnCTFnvZo3WzMFg=="}
 
 class Draft {
   final double? de;
@@ -175,7 +175,7 @@ class Draft {
     this.enNum,
     this.en,
   });
-// generated-dart-fixer-start{"md5Hash":"CSemhVC8Q9DJEt9egWArJQ=="}
+// generated-dart-fixer-start{"md5Hash":"RhRKVXBsf1YJ72UiysF7wQ=="}
 
   factory Draft.fromJson(Map json) {
     return Draft(
@@ -239,14 +239,14 @@ class Draft {
     }}";
   }
 
-  List<Object?> get allFields => [
+  List<Object?> get props => [
         de,
         enNum,
         en,
       ];
 }
 
-enum DraftFields {
+enum DraftField {
   de(
     "double?",
     isFinal: true,
@@ -275,16 +275,16 @@ enum DraftFields {
 
   Object? get(Draft object) {
     switch (this) {
-      case DraftFields.de:
+      case DraftField.de:
         return object.de;
-      case DraftFields.enNum:
+      case DraftField.enNum:
         return object.enNum;
-      case DraftFields.en:
+      case DraftField.en:
         return object.en;
     }
   }
 
-  const DraftFields(
+  const DraftField(
     this.type, {
     required this.isFinal,
     required this.isVariable,
@@ -362,7 +362,7 @@ class DraftBuilder {
   DraftBuilder copyWith(DraftBuilder other) => clone().apply(other);
 }
 
-// generated-dart-fixer-end{"md5Hash":"CSemhVC8Q9DJEt9egWArJQ=="}
+// generated-dart-fixer-end{"md5Hash":"RhRKVXBsf1YJ72UiysF7wQ=="}
 enum DraftEnNum {
   $1(1),
   $2(2),
