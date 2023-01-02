@@ -20,3 +20,7 @@ dart_fixer:
       dartDir: lib/models/input/
       inputKind: dart
       outputKind: schema
+    typedefs:
+      jsonDir: lib/models/typedefs
+      dartDir: lib/models/typedefs/
+      inputKind: typeDefinition
