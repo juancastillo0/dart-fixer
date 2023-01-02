@@ -2,6 +2,7 @@ import {
   DartClass,
   DartConstructor,
   DartConstructorParam,
+  DartDefBase,
   DartEnum,
   DartExtension,
   DartField,
@@ -14,6 +15,7 @@ import { req } from "./printer";
 export class DartModelPrinter {
   printClass = (dartClass: DartClass): string => {
     return `\
+${this.printCommentAndAnnotation(dartClass)}\
 ${dartClass.isAbstract ? "abstract " : ""}class ${dartClass.name}\
 ${dartClass.generics ?? ""}\
 ${dartClass.extendsBound ? " extends " + dartClass.extendsBound : ""}\
@@ -32,6 +34,7 @@ ${
 
   printEnum = (dartEnum: DartEnum): string => {
     return `\
+${this.printCommentAndAnnotation(dartEnum)}\
 enum ${dartEnum.name}\
 ${dartEnum.generics ?? ""}\
 ${dartEnum.mixins.length > 0 ? " with " + dartEnum.mixins.join(", ") : ""}\
@@ -42,16 +45,17 @@ ${
 }\
 {
   ${dartEnum.entries
-    .map(
-      (e) =>
-        `${e.name}${e.generics ?? ""}${
-          e.arguments.length === 0
-            ? ""
-            : `(${e.arguments
-                .map((a) => (a.name ? a.name + " :" : "") + a.value)
-                .join(", ")})`
-        }`
-    )
+    .map((e) => {
+      const args =
+        e.arguments.length === 0
+          ? ""
+          : `(${e.arguments
+              .map((a) => (a.name ? a.name + " :" : "") + a.value)
+              .join(", ")})`;
+      return `\
+${this.printCommentAndAnnotation(dartEnum)}\
+${e.name}${e.generics ?? ""}${args}`;
+    })
     .join(",\n  ")};
 ${dartEnum.fields.map(this.printField).join("\n  ")}\
 ${dartEnum.constructors.map(this.printConstructor).join("\n  ")}\
@@ -61,6 +65,7 @@ ${dartEnum.methods.map(this.printFunction).join("\n  ")}\
 
   printMixin = (dartMixin: DartMixin): string => {
     return `\
+${this.printCommentAndAnnotation(dartMixin)}\
 mixin ${dartMixin.name}\
 ${dartMixin.generics ?? ""}\
 ${dartMixin.on.length > 0 ? " on " + dartMixin.on.join(", ") : ""}\
@@ -77,6 +82,7 @@ ${dartMixin.methods.map(this.printFunction).join("\n  ")}
 
   printExtension = (dartExtension: DartExtension): string => {
     return `\
+${this.printCommentAndAnnotation(dartExtension)}\
 extension${dartExtension.name ? " " + dartExtension.name : ""}\
 ${dartExtension.generics ?? ""}\
 ${dartExtension.on ? " on " + dartExtension.on : ""}\
@@ -89,6 +95,7 @@ ${dartExtension.methods.map(this.printFunction).join("\n  ")}
 
   printConstructor = (dartConstructor: DartConstructor): string => {
     return `\
+${this.printCommentAndAnnotation(dartConstructor)}\
 ${dartConstructor.isConst ? "const " : ""}\
 ${dartConstructor.isFactory ? "factory " : ""}\
 ${dartConstructor.dartType.name}${
@@ -100,7 +107,9 @@ ${dartConstructor.dartType.name}${
 
   printField = (dartField: DartField): string => {
     return `\
+${this.printCommentAndAnnotation(dartField)}\
 ${dartField.isStatic ? "static " : ""}\
+${dartField.isLate ? "late " : ""}\
 ${dartField.isFinal ? "final " : ""}\
 ${dartField.isVariable ? "var " : ""}\
 ${dartField.type ? dartField.type + " " : ""}${dartField.name}\
@@ -108,7 +117,9 @@ ${dartField.defaultValue ? " = " + dartField.defaultValue : ""};`;
   };
 
   printFunction = (dartFunction: DartFunction): string => {
+    // TODO: test getter and setter
     return `\
+${this.printCommentAndAnnotation(dartFunction)}\
 ${dartFunction.isStatic ? "static " : ""}\
 ${dartFunction.isExternal ? "external " : ""}\
 ${dartFunction.returnType ? dartFunction.returnType + " " : ""}\
@@ -153,6 +164,7 @@ ${dartFunction.body ?? ";"}`;
     return `\
 ${dartParam.isNamed && dartParam.isRequired ? `${req} ` : ""}\
 ${
+  // TODO: verify dartParam.type is the same as the field's type
   dartParam.type && !(dartParam.isSuper || dartParam.isThis)
     ? dartParam.type + " "
     : ""
@@ -169,5 +181,19 @@ ${dartParam.isNamed && dartParam.isRequired ? `${req} ` : ""}\
 ${dartParam.type ? dartParam.type + " " : ""}\
 ${dartParam.name}\
 ${dartParam.defaultValue ? " = " + dartParam.defaultValue : ""}`;
+  };
+
+  printCommentAndAnnotation = (dartDef: DartDefBase): string => {
+    return `\
+${
+  dartDef.comment
+    ? dartDef.comment.endsWith("\n")
+      ? dartDef.comment
+      : dartDef.comment + "\n"
+    : ""
+}\
+${dartDef.annotations
+  .map((a) => `${a.qualifiedName}${a.args ?? ""}\n`)
+  .join()}`;
   };
 }
