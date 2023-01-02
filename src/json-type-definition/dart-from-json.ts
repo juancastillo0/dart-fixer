@@ -9,7 +9,7 @@ import {
   DartFunctionParam,
   toDartIdentifier,
 } from "../dart-base/parser";
-import { makeConstructorFromFields, question } from "../printer";
+import { makeConstructorFromFields, question } from "../generator/printer";
 import { recase } from "../utils";
 import { SomeJTDSchemaType } from "./schema-type";
 

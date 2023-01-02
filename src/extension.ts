@@ -5,12 +5,12 @@ import { DartAnalyzer } from "./dart-base/analyzer";
 import { parsePubspec } from "./dart-base/dart-dependencies";
 import { CommentsCodeActions } from "./dart-docs/vscode-docs-diagnostic";
 import { ExtensionConfig, getDefaultGeneratorConfig } from "./extension-config";
-import { GeneratedSection, JsonFileKind } from "./generator-utils";
+import { GeneratedSection, JsonFileKind } from "./generator/generator-utils";
 import {
   executeJsonToDartCommand,
   JsonTypeDefinitionDartCodeActionProvider,
 } from "./json-type-definition/vscode-json-edit";
-import { ClassGenerator } from "./printer";
+import { ClassGenerator } from "./generator/printer";
 import {
   createOutOfDateDiagnostic,
   formatFiles,

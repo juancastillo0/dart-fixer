@@ -1,5 +1,5 @@
-import { JsonFileKind } from "./generator-utils";
-import { GenerationOptions } from "./printer";
+import { JsonFileKind } from "./generator/generator-utils";
+import { GenerationOptions } from "./generator/printer";
 
 export interface ExtensionConfig {
   generatorConfig?: string;

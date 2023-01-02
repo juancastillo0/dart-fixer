@@ -12,7 +12,7 @@ import {
   JsonEditParams,
   JsonFileKind,
   nameFromFile,
-} from "../generator-utils";
+} from "../generator/generator-utils";
 import { pathFromUri, subscribeToDocumentChanges } from "../vscode-utils";
 import {
   dartModelsToJsonType,

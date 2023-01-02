@@ -2,7 +2,7 @@ import {
   //   TODO: createOutOfDateDiagnostic,
   GeneratedSection,
   getGeneratedSections,
-} from "../generator-utils";
+} from "../generator/generator-utils";
 import { parseClassesAntlr } from "../antlr/antlr-parser";
 import {
   getDartPackageData,
@@ -14,7 +14,7 @@ import {
   ResolveUriParams,
 } from "./dart-dependencies";
 import { DartParsedFile, DartType, DartTypeAlias, DartTypeDef } from "./parser";
-import { GenerationOptions } from "../printer";
+import { GenerationOptions } from "../generator/printer";
 import * as path from "path";
 import * as minimatch from "minimatch";
 import { getDefaultGeneratorConfig } from "../extension-config";

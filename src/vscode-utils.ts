@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { FileSystemManager, TextDocument } from "./dart-base/analyzer";
 import { Path } from "./dart-base/dart-dependencies";
 import { EXTENSION_NAME } from "./extension";
-import { GeneratedSection } from "./generator-utils";
+import { GeneratedSection } from "./generator/generator-utils";
 
 export class VsCodeFileSystem implements FileSystemManager {
   async openTextDocument(path: string): Promise<TextDocument> {
