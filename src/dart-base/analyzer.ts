@@ -2,8 +2,8 @@ import {
   //   TODO: createOutOfDateDiagnostic,
   GeneratedSection,
   getGeneratedSections,
-} from "./generator-utils";
-import { parseClassesAntlr } from "./antlr/antlr-parser";
+} from "../generator-utils";
+import { parseClassesAntlr } from "../antlr/antlr-parser";
 import {
   getDartPackageData,
   getRootDir,
@@ -14,10 +14,10 @@ import {
   ResolveUriParams,
 } from "./dart-dependencies";
 import { DartParsedFile, DartType, DartTypeAlias, DartTypeDef } from "./parser";
-import { GenerationOptions } from "./printer";
+import { GenerationOptions } from "../printer";
 import * as path from "path";
 import * as minimatch from "minimatch";
-import { getDefaultGeneratorConfig } from "./extension-config";
+import { getDefaultGeneratorConfig } from "../extension-config";
 
 // https://stackoverflow.com/questions/69333492/vscode-create-a-document-in-memory-with-uri-for-automated-testing
 export abstract class FileSystemManager {

@@ -15,8 +15,8 @@ import {
   DartTypeAlias,
   DartImport,
   DartEnumEntry,
-} from "../parser";
-import { Bracket, getBrackets } from "../parser-utils";
+} from "../dart-base/parser";
+import { Bracket, getBrackets } from "../dart-base/parser-utils";
 
 suite("Parser Test Suite", () => {
   test("Brackets", () => {

@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
-import { DartAnalyzer } from "./analyzer";
-import { DartModelPrinter } from "./dart-model-printer";
+import { DartAnalyzer } from "./dart-base/analyzer";
+import { DartModelPrinter } from "./dart-base/dart-model-printer";
 import {
   DartClass,
   DartConstructor,
@@ -12,7 +12,7 @@ import {
   DartFunction,
   DartFunctionParam,
   DartType,
-} from "./parser";
+} from "./dart-base/parser";
 
 export interface GenerationOptions {
   /** Generates a `Model.fromJson(Map json)` factory inside the class. */

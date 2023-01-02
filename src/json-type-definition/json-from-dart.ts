@@ -5,7 +5,7 @@ import {
   DartField,
   DartMetadata,
   DartType,
-} from "../parser";
+} from "../dart-base/parser";
 import { SomeJTDSchemaType } from "./schema-type";
 
 export type JsonTypeDartSpec =

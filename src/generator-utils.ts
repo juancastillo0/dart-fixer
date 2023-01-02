@@ -1,6 +1,6 @@
-import { CleanedText, TextPosition } from "./parser-utils";
-import { DartAnalyzer } from "./analyzer";
-import { DartModelPrinter } from "./dart-model-printer";
+import { CleanedText, TextPosition } from "./dart-base/parser-utils";
+import { DartAnalyzer } from "./dart-base/analyzer";
+import { DartModelPrinter } from "./dart-base/dart-model-printer";
 import { dartTypeFromJsonSchema } from "./json-schema/dart-from-schema";
 import { quicktypeJSON } from "./json-schema/schema-from-document";
 import { SomeJSONSchema } from "./json-schema/schema-type";

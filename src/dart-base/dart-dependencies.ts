@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as yaml from "yaml";
 import { FileSystemManager } from "./analyzer";
 import * as path from "path";
-import { ExtensionConfig } from "./extension-config";
+import { ExtensionConfig } from "../extension-config";
 
 export type PubSpecDependency = Record<
   string,

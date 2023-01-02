@@ -1,8 +1,8 @@
 import { createHash } from "crypto";
-import { DartAnalyzer } from "../analyzer";
+import { DartAnalyzer } from "../dart-base/analyzer";
 import { createDartModelFromJSON, JsonFileKind } from "../generator-utils";
 import { JsonSchemaFromDart } from "../json-schema/json-from-dart";
-import { DartDefKind, DartParsedFile } from "../parser";
+import { DartDefKind, DartParsedFile } from "../dart-base/parser";
 import { JsonTypeDartSpec, JsonTypeDefFromDart } from "./json-from-dart";
 
 export const generateOutput = async (

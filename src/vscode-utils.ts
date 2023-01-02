@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { FileSystemManager, TextDocument } from "./analyzer";
-import { Path } from "./dart-dependencies";
+import { FileSystemManager, TextDocument } from "./dart-base/analyzer";
+import { Path } from "./dart-base/dart-dependencies";
 import { EXTENSION_NAME } from "./extension";
 import { GeneratedSection } from "./generator-utils";
 

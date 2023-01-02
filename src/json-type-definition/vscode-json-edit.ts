@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DartAnalyzer } from "../analyzer";
+import { DartAnalyzer } from "../dart-base/analyzer";
 import {
   COMMAND_GENERATE_JSON_DOCUMENT,
   COMMAND_GENERATE_JSON_SCHEMA,

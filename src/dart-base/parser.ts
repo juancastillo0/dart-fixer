@@ -608,6 +608,7 @@ export class DartField implements DartFieldOrParam, DartDefBase {
   isVariable: boolean;
   type: string | null;
   defaultValue: string | null;
+  // TODO: default value type
   parentType: DartTypeScope | null;
   comment: string | null;
   annotations: Array<DartMetadata>;

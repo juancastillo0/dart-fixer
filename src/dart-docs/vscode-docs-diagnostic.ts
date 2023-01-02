@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { DartAnalyzer } from "../analyzer";
-import { LexerComment } from "../parser";
+import { DartAnalyzer } from "../dart-base/analyzer";
+import { LexerComment } from "../dart-base/parser";
 import {
   pathFromUri,
   subscribeToDocumentChanges,

@@ -68,13 +68,13 @@ import {
   LexerComment,
   DartFileHeader,
   DartFileKind,
-} from "../parser";
+} from "../dart-base/parser";
 import { Interval } from "antlr4ts/misc/Interval";
 import {
   binarySearch,
   BracketWithOriginal,
   cleanRawText,
-} from "../parser-utils";
+} from "../dart-base/parser-utils";
 import { zip } from "../utils";
 
 export class ParseCtx {

@@ -1,8 +1,8 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { DartAnalyzer } from "./analyzer";
-import { parsePubspec } from "./dart-dependencies";
+import { DartAnalyzer } from "./dart-base/analyzer";
+import { parsePubspec } from "./dart-base/dart-dependencies";
 import { CommentsCodeActions } from "./dart-docs/vscode-docs-diagnostic";
 import { ExtensionConfig, getDefaultGeneratorConfig } from "./extension-config";
 import { GeneratedSection, JsonFileKind } from "./generator-utils";

@@ -13,7 +13,7 @@ import {
   DartField,
   DartFunction,
   toDartIdentifier,
-} from "../parser";
+} from "../dart-base/parser";
 import { question } from "../printer";
 import { recase } from "../utils";
 import { Known, Nullable, PartialSchema, SomeJSONSchema } from "./schema-type";

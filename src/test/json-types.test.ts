@@ -1,6 +1,6 @@
 import * as assert from "assert";
 import * as fs from "fs";
-import { DartAnalyzer, FileSystemManager } from "../analyzer";
+import { DartAnalyzer, FileSystemManager } from "../dart-base/analyzer";
 import { parseClassesAntlr } from "../antlr/antlr-parser";
 import { createDartModelFromJSON, JsonFileKind } from "../generator-utils";
 import { removeMatch } from "./parser.test";
