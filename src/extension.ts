@@ -22,6 +22,7 @@ import {
   textDocumentFromVsCode,
   VsCodeFileSystem,
 } from "./vscode-utils";
+import { parseYamlOrJson } from "./utils";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
@@ -178,8 +179,11 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   /// Pubspec and config watchers
-  // TODO: custom dartfixer.{yaml,yml,json,jsonc}
   const watcher = vscode.workspace.createFileSystemWatcher("**/pubspec.yaml");
+  /// custom dart-fixer.config.{yaml,yml,json,jsonc,json5}
+  const customConfigWatcher = vscode.workspace.createFileSystemWatcher(
+    "**/dart-fixer.config.{yaml,yml,json,jsonc,json5}"
+  );
   const onChangePubspec = async (
     uri: vscode.Uri,
     opts?: { deleted: boolean }
@@ -190,13 +194,26 @@ export function activate(context: vscode.ExtensionContext): void {
     } else {
       try {
         const document = await vscode.workspace.openTextDocument(uri);
-        const data = parsePubspec(document.getText());
-        if (!data) {
-          return;
+        if (uri.fsPath.endsWith("pubspec.yaml")) {
+          const data = parsePubspec(document.getText());
+          if (!data) {
+            return;
+          }
+          await analyzer.updatePubspec(pathFromUri(uri), data);
+          // TODO: get info from multiple pubspec
+          await jsonCodeActions.updateConfig(data.dart_fixer);
+        } else {
+          const data = parseYamlOrJson(textDocumentFromVsCode(document));
+          const result = extensionConfigValidate.validate(data);
+          if (result.success) {
+            const config = result.value;
+            // TODO: use path pathFromUri(uri)
+            analyzer.updateConfig(getDefaultGeneratorConfig(config));
+            await jsonCodeActions.updateConfig(config);
+          } else {
+            console.log(result.getErrorMessage());
+          }
         }
-        await analyzer.updatePubspec(pathFromUri(uri), data);
-        // TODO: get info from multiple pubspec
-        await jsonCodeActions.updateConfig(data.dart_fixer);
       } catch (error) {
         console.error(error);
       }
@@ -207,6 +224,14 @@ export function activate(context: vscode.ExtensionContext): void {
     watcher.onDidChange(onChangePubspec),
     watcher.onDidCreate(onChangePubspec),
     watcher.onDidDelete((uri) => onChangePubspec(uri, { deleted: true }))
+  );
+  context.subscriptions.push(
+    customConfigWatcher,
+    customConfigWatcher.onDidChange(onChangePubspec),
+    customConfigWatcher.onDidCreate(onChangePubspec),
+    customConfigWatcher.onDidDelete((uri) =>
+      onChangePubspec(uri, { deleted: true })
+    )
   );
 
   context.subscriptions.push(

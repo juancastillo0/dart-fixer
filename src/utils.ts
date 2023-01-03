@@ -4,6 +4,9 @@ import Ajv, {
   ValidateFunction,
 } from "ajv/dist/jtd";
 import { camelCase, constantCase, pascalCase, snakeCase } from "change-case";
+import { TextDocument } from "./dart-base/analyzer";
+import * as yaml from "yaml";
+import * as JSON5 from "json5";
 
 export const recase = (
   str: string,
@@ -76,4 +79,14 @@ export const compileCustomValidator = <T>(
       };
     },
   };
+};
+
+export const parseYamlOrJson = (doc: TextDocument): unknown => {
+  let data: unknown;
+  if (doc.uri.match(/\.(yaml|yml)$/)) {
+    data = yaml.parse(doc.getText());
+  } else {
+    data = JSON5.parse(doc.getText());
+  }
+  return data;
 };
