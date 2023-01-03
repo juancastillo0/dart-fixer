@@ -2,7 +2,7 @@ import { JsonFileKind } from "./generator/generator-utils";
 import {
   GenerationOptions,
   generationOptionsSchema,
-} from "./generator/printer";
+} from "./generator/generator-config";
 import { AjvJTDSchemaType, compileCustomValidator } from "./utils";
 
 export enum ErrorAnalysisBehavior {

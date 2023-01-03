@@ -14,7 +14,7 @@ import {
   ResolveUriParams,
 } from "./dart-dependencies";
 import { DartParsedFile, DartType, DartTypeAlias, DartTypeDef } from "./parser";
-import { GenerationOptions } from "../generator/printer";
+import { GenerationOptions } from "../generator/generator-config";
 import * as path from "path";
 import * as minimatch from "minimatch";
 import { getDefaultGeneratorConfig } from "../extension-config";
