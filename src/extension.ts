@@ -4,7 +4,11 @@ import * as vscode from "vscode";
 import { DartAnalyzer } from "./dart-base/analyzer";
 import { parsePubspec } from "./dart-base/dart-dependencies";
 import { CommentsCodeActions } from "./dart-docs/vscode-docs-diagnostic";
-import { ExtensionConfig, getDefaultGeneratorConfig } from "./extension-config";
+import {
+  ExtensionConfig,
+  extensionConfigValidate,
+  getDefaultGeneratorConfig,
+} from "./extension-config";
 import { GeneratedSection, JsonFileKind } from "./generator/generator-utils";
 import {
   executeJsonToDartCommand,
@@ -55,8 +59,15 @@ const COMMAND_OBJECT: vscode.Command = {
   tooltip: "FixImports",
 };
 
-const getExtensionConfig = (): ExtensionConfig | undefined =>
-  vscode.workspace.getConfiguration(`dartFixer`).get("config");
+const getExtensionConfig = (): ExtensionConfig | undefined => {
+  const config = vscode.workspace.getConfiguration(`dartFixer`).get("config");
+  const result = extensionConfigValidate.validate(config);
+  if (!result.success) {
+    console.log(result.getErrorMessage());
+    return undefined;
+  }
+  return result.value;
+};
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed

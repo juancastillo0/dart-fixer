@@ -13,6 +13,7 @@ import {
   DartFunctionParam,
   DartType,
 } from "../dart-base/parser";
+import { AjvJTDSchemaType, compileCustomValidator } from "../utils";
 
 export interface GenerationOptions {
   /** Generates a `Model.fromJson(Map json)` factory inside the class. */
@@ -118,6 +119,78 @@ export interface GenerationOptions {
     metadata?: string;
   };
 }
+
+export const generationOptionsSchema: AjvJTDSchemaType<GenerationOptions> = {
+  optionalProperties: {
+    toJson: {
+      optionalProperties: {
+        nested: { type: "boolean" },
+        metadata: { type: "string" },
+      },
+    },
+    fromJson: {
+      optionalProperties: {
+        constructorName: { type: "string" },
+        metadata: { type: "string" },
+        parameterType: {
+          enum: ["Object?", "dynamic", "Map", "Map<String, Object?>"],
+        },
+      },
+    },
+    equality: {
+      optionalProperties: {
+        equalsMethod: { type: "string" },
+        hashMethod: { type: "string" },
+        customImport: { type: "string" },
+        deep: { type: "boolean" },
+      },
+    },
+    copyWith: {
+      optionalProperties: {
+        metadata: { type: "string" },
+      },
+    },
+    toStringOverride: {
+      optionalProperties: {
+        metadata: { type: "string" },
+      },
+    },
+    allFieldsGetter: {
+      optionalProperties: {
+        name: { type: "string" },
+        metadata: { type: "string" },
+      },
+    },
+    allFieldsEnum: {
+      optionalProperties: {
+        nameTemplate: { type: "string" },
+        metadata: { type: "string" },
+      },
+    },
+    builder: {
+      optionalProperties: {
+        nameTemplate: { type: "string" },
+        metadata: { type: "string" },
+      },
+    },
+    observable: {
+      properties: {
+        reactivityClass: { type: "string" },
+        customImport: { type: "string" },
+      },
+      optionalProperties: {
+        nameTemplate: { type: "string" },
+        collectionsReactivityClass: { type: "boolean" },
+        passThisToConstructor: { type: "boolean" },
+        metadata: { type: "string" },
+      },
+    },
+  },
+};
+
+export const generationOptionsValidate = compileCustomValidator(
+  generationOptionsSchema
+);
 
 export let question = "?";
 export let req = "required";

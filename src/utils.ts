@@ -1,3 +1,8 @@
+import Ajv, {
+  ErrorObject,
+  JTDSchemaType as AjvJTDSchemaType,
+  ValidateFunction,
+} from "ajv/dist/jtd";
 import { camelCase, constantCase, pascalCase, snakeCase } from "change-case";
 
 export const recase = (
@@ -33,4 +38,42 @@ export const zipMapped = <T1, T2, O>(
   mapper: (elem1: T1, elem2: T2) => O
 ): Array<O> => {
   return array1.map((e, i) => mapper(e, array2[i]));
+};
+
+export { AjvJTDSchemaType };
+export const globalAjv = new Ajv();
+
+export interface SchemaValidator<T> {
+  base: ValidateFunction<T>;
+  schema: AjvJTDSchemaType<T>;
+  validate: <O>(value: O) =>
+    | { success: true; value: T }
+    | {
+        success: false;
+        errors: Array<ErrorObject>;
+        getErrorMessage: () => string;
+      };
+}
+
+export const compileCustomValidator = <T>(
+  schema: AjvJTDSchemaType<T>
+): SchemaValidator<T> => {
+  const base = globalAjv.compile(schema);
+  return {
+    base,
+    schema,
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+    validate: <O>(value: O) => {
+      const success = base(value);
+      if (success) {
+        return { success, value };
+      }
+      const errors = base.errors!;
+      return {
+        success,
+        errors,
+        getErrorMessage: () => globalAjv.errorsText(errors),
+      };
+    },
+  };
 };

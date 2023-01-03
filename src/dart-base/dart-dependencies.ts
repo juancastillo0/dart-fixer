@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as yaml from "yaml";
 import { FileSystemManager } from "./analyzer";
 import * as path from "path";
-import { ExtensionConfig } from "../extension-config";
+import { ExtensionConfig, extensionConfigValidate } from "../extension-config";
 
 export type PubSpecDependency = Record<
   string,
@@ -50,6 +50,12 @@ export const getDartPackageData = async (
 export const parsePubspec = (text: string): PubSpecData | undefined => {
   try {
     const data = yaml.parse(text) as PubSpecData;
+    if (data.dart_fixer) {
+      const result = extensionConfigValidate.validate(data.dart_fixer);
+      if (!result.success) {
+        throw new Error(result.getErrorMessage());
+      }
+    }
     return data;
   } catch (error) {
     console.error("Error parsing pubspec.yaml", error);
