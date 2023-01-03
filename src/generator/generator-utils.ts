@@ -9,7 +9,7 @@ import {
   JsonSchemaCtx,
 } from "../json-type-definition/dart-from-json";
 import { SomeJTDSchemaType } from "../json-type-definition/schema-type";
-import { ClassGenerator } from "./printer";
+import { ClassGenerator } from "./generator";
 import { createHash } from "crypto";
 
 export interface GeneratedSection {

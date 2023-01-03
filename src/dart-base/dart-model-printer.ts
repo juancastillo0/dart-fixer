@@ -10,7 +10,7 @@ import {
   DartFunctionParam,
   DartMixin,
 } from "./parser";
-import { req } from "../generator/printer";
+import { req } from "../generator/generator";
 
 export class DartModelPrinter {
   printClass = (dartClass: DartClass): string => {

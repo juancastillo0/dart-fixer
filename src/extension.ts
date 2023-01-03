@@ -14,7 +14,7 @@ import {
   executeJsonToDartCommand,
   JsonTypeDefinitionDartCodeActionProvider,
 } from "./json-type-definition/vscode-json-edit";
-import { ClassGenerator } from "./generator/printer";
+import { ClassGenerator } from "./generator/generator";
 import {
   createOutOfDateDiagnostic,
   formatFiles,

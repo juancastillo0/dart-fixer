@@ -1,7 +1,7 @@
 import * as assert from "assert";
 import { Test } from "mocha";
 import { parseClassesAntlr } from "../antlr/antlr-parser";
-import { ClassGenerator } from "../generator/printer";
+import { ClassGenerator } from "../generator/generator";
 
 export const testF = (name: string, func: () => unknown): Test => {
   return test(name, () => {

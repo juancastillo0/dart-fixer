@@ -14,7 +14,7 @@ import {
   DartFunction,
   toDartIdentifier,
 } from "../dart-base/parser";
-import { question } from "../generator/printer";
+import { question } from "../generator/generator";
 import { recase } from "../utils";
 import { Known, Nullable, PartialSchema, SomeJSONSchema } from "./schema-type";
 
