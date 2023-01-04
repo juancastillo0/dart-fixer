@@ -1,4 +1,8 @@
 [![Coverage Status](https://coveralls.io/repos/github/juancastillo0/dart-fixer/badge.svg?branch=main)](https://coveralls.io/github/juancastillo0/dart-fixer?branch=main)
+[![CI tests](https://github.com/juancastillo0/dart-fixer/actions/workflows/ci.yml/badge.svg)](https://github.com/juancastillo0/dart-fixer/actions/workflows/ci.yml)
+[![dart-fixer is released under the MIT license.](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/juancastillo0/dart-fixer/blob/main/LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
+
 
 - [dart-fixer](#dart-fixer)
 - [Features](#features)

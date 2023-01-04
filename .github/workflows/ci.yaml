@@ -34,13 +34,13 @@ jobs:
         if: always() && steps.install.outcome == 'success'
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
-        if: matrix.os == 'ubuntu-latest' && steps.mochaTestsCoverage.outcome == 'success'
+        if: always() && matrix.os == 'ubuntu-latest' && steps.mochaTestsCoverage.outcome == 'success'
         with:
           fail_ci_if_error: true
           files: "./coverage/lcov.info"
       - name: Upload coverage to Coveralls
         uses: coverallsapp/github-action@master
-        if: matrix.os == 'ubuntu-latest' && steps.mochaTestsCoverage.outcome == 'success'
+        if: always() && matrix.os == 'ubuntu-latest' && steps.mochaTestsCoverage.outcome == 'success'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: "./coverage/lcov.info"
