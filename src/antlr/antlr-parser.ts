@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { TerminalNode } from "antlr4ts/tree/TerminalNode";
 import {
   FormalParameterPartContext,

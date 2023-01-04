@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/array-type */
 // https://github.com/ajv-validator/ajv/blob/35034b6b1bbaf144595713d50415501138db0036/lib/types/json-schema.ts
 /* eslint-disable @typescript-eslint/no-empty-interface */
 type StrictNullChecksWrapper<Name extends string, Type> = undefined extends null

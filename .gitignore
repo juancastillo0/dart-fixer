@@ -7,3 +7,5 @@ node_modules
 src/.DS_Store
 .fvm/flutter_sdk
 test_workspace/.fvm/flutter_sdk
+.nyc_output/
+coverage/

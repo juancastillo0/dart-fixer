@@ -1,5 +1,10 @@
 import { JsonTypeDartSpec } from "../json-type-definition/json-from-dart";
-import { DartDefKind, DartField, DartMetadata, DartType } from "../dart-base/parser";
+import {
+  DartDefKind,
+  DartField,
+  DartMetadata,
+  DartType,
+} from "../dart-base/parser";
 import { JSONSchemaType, Known, Nullable } from "./schema-type";
 
 type JSONSchemaT =

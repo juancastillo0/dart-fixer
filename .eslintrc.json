@@ -35,6 +35,8 @@
         "dist",
         "webpack.config.js",
         "**/*.d.ts",
+        "src/json-schema/core",
+        "src/json-schema/rewrites",
         "src/antlr/generated-antlr/DartLexer.ts",
         "src/antlr/generated-antlr/DartParser.ts"
     ]
