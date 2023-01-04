@@ -1,8 +1,6 @@
 import {
   addPathToCtx,
-  createUnionClass,
   JsonSchemaCtx,
-  UnionKind,
 } from "../json-type-definition/dart-from-json";
 import {
   DartClass,
@@ -14,6 +12,7 @@ import {
   DartFunction,
   toDartIdentifier,
 } from "../dart-base/parser";
+import { createUnionClass, UnionKind } from "../generator/dart-model-utils";
 import { question } from "../generator/generator";
 import { recase } from "../utils";
 import { Known, Nullable, PartialSchema, SomeJSONSchema } from "./schema-type";

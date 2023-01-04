@@ -84,7 +84,7 @@ class BOther implements B {
   String? get pos => throw UnimplementedError();
 
   @override
-  List<Object?> get allFields => throw UnimplementedError();
+  List<Object?> get props => throw UnimplementedError();
 
   @override
   Other copyWith({List? md, String? po2, String? pos, bool posToNull = false}) {
