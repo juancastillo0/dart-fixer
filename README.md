@@ -1,4 +1,5 @@
-[![Coverage Status](https://coveralls.io/repos/github/juancastillo0/dart-fixer/badge.svg?branch=main)](https://coveralls.io/github/juancastillo0/dart-fixer?branch=main)
+[![Code coverage Coveralls](https://coveralls.io/repos/github/juancastillo0/dart-fixer/badge.svg?branch=main)](https://coveralls.io/github/juancastillo0/dart-fixer?branch=main)
+[![Code coverage Codecov](https://codecov.io/gh/juancastillo0/dart-fixer/branch/main/graph/badge.svg?token=QJLQSCIJ42)](https://codecov.io/gh/juancastillo0/dart-fixer)
 [![CI tests](https://github.com/juancastillo0/dart-fixer/actions/workflows/ci.yaml/badge.svg)](https://github.com/juancastillo0/dart-fixer/actions/workflows/ci.yaml)
 [![dart-fixer is released under the MIT license.](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/juancastillo0/dart-fixer/blob/main/LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)

@@ -30,8 +30,8 @@ jobs:
         run: npm run mocha-coverage
         if: always() && steps.compileTests.outcome == 'success'
       - id: vscodeExtensionTests
-        run: npm run compile && node ./out/test/runTest.js
-        if: always() && steps.install.outcome == 'success'
+        run: npm run compile && xvfb-run -a node ./out/test/runTest.js
+        if: always() && matrix.os == 'ubuntu-latest' && steps.compileTests.outcome == 'success'
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v2
         if: always() && matrix.os == 'ubuntu-latest' && steps.mochaTestsCoverage.outcome == 'success'
