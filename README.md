@@ -220,11 +220,6 @@ Ensure that you've read through the extensions guidelines and follow the best pr
 
 * [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
 
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://docs.github.com/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github)
-
 **Enjoy!**
 
 
