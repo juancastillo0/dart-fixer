@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/juancastillo0/dart-fixer/badge.svg?branch=main)](https://coveralls.io/github/juancastillo0/dart-fixer?branch=main)
+
 - [dart-fixer](#dart-fixer)
 - [Features](#features)
   - [Dart model, JSON Schema and JSON Type Definition](#dart-model-json-schema-and-json-type-definition)
@@ -25,7 +27,6 @@
   - [Test Extension](#test-extension)
     - [Test Workspace](#test-workspace)
   - [Following extension guidelines](#following-extension-guidelines)
-  - [For more information](#for-more-information)
 
 # dart-fixer
 
