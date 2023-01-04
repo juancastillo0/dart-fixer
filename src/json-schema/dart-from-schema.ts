@@ -33,29 +33,30 @@ export const dartTypeFromJsonSchema = (
   return ctx;
 };
 
-const resolveRef = (
-  ctx: JsonSchemaCtx,
-  ref: string
-): DartClass | DartEnum | { name: string } | undefined => {
-  const definitionIndex = ref.includes("#/$defs/")
-    ? ref.split("#/$defs/")
-    : ref.split("#/definitions/");
-  const definition =
-    definitionIndex.length === 2 ? definitionIndex[1] : undefined;
+// TODO: implement proper references
+// const resolveRef = (
+//   ctx: JsonSchemaCtx,
+//   ref: string
+// ): DartClass | DartEnum | { name: string } | undefined => {
+//   const definitionIndex = ref.includes("#/$defs/")
+//     ? ref.split("#/$defs/")
+//     : ref.split("#/definitions/");
+//   const definition =
+//     definitionIndex.length === 2 ? definitionIndex[1] : undefined;
 
-  if (ref.startsWith("#")) {
-    // current document
-  } else if (ref.startsWith("/")) {
-    // root
-  } else if (ref.startsWith("file://")) {
-    // external file
-  } else if (ref.match(/^\d[^#]*#?$/)) {
-    // json relative path
-  } else {
-    // json or file relative path
-  }
-  return undefined;
-};
+//   if (ref.startsWith("#")) {
+//     // current document
+//   } else if (ref.startsWith("/")) {
+//     // root
+//   } else if (ref.startsWith("file://")) {
+//     // external file
+//   } else if (ref.match(/^\d[^#]*#?$/)) {
+//     // json relative path
+//   } else {
+//     // json or file relative path
+//   }
+//   return undefined;
+// };
 
 type DiscriminantFields = Array<{
   field: DartField;
@@ -125,8 +126,7 @@ const mapJsonSchemaListType = (
 
 const mapJsonSchemaType = (
   ctx: JsonSchemaCtx,
-  schema: SomeJSONSchema &
-    Partial<Nullable<object | string | number | boolean | bigint | undefined>>
+  schema: SomeJSONSchema & Partial<Nullable<EnumValue>>
 ): DartClass | DartEnum | { name: string } => {
   if (schema.$ref && ctx.typeById.has(schema.$ref)) {
     const value = ctx.typeById.get(schema.$ref)!;
