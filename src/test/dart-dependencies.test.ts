@@ -42,7 +42,7 @@ suite("Dart Dependencies", () => {
         uri: "lib/nested/file.dart",
         pubSpecUri: "./nested/pubspec.yaml",
       }),
-      "/nested" // TODO: should it be "./nested"?
+      "nested" // TODO: should it be "./nested"?
     );
 
     assert.deepStrictEqual(
@@ -78,7 +78,7 @@ import "package:package_name/f6.dart";
       rootDir: "/project/", // dart project dir
       importItem: importItems[0],
     });
-    assert.deepStrictEqual(uri, "/lib/imports/f1.dart"); // TODO: should it start with "/"?
+    assert.deepStrictEqual(uri, "lib/imports/f1.dart"); // TODO: should it start with "/"?
     // import "../nested/f2.dart";
     uri = resolveUri({
       fileUri,
@@ -86,7 +86,7 @@ import "package:package_name/f6.dart";
       rootDir: undefined,
       importItem: importItems[1],
     });
-    assert.deepStrictEqual(uri, "/lib/nested/f2.dart"); // TODO: should it start with "/"?
+    assert.deepStrictEqual(uri, "lib/nested/f2.dart"); // TODO: should it start with "/"?
     // import "/nested/f3.dart";
     uri = resolveUri({
       fileUri,

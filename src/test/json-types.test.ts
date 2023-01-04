@@ -26,9 +26,7 @@ suite("type model schemas JSON", () => {
       {
         text: schemaFileText,
         newFile: params.newFile,
-        jsonFile: params.schemaPath.slice(
-          params.schemaPath.lastIndexOf("/") + 1
-        ),
+        jsonFile: params.schemaPath,
       },
       params.jsonKind,
       analyzer
@@ -43,13 +41,14 @@ suite("type model schemas JSON", () => {
     const parsedOutput = parseClassesAntlr(dartFileText, {
       packageName,
     });
+    const toRemove = ["comments", "body", "cleanText", "comment"];
     // TODO: don't remove comment
-    const p = removeMatch([parsed], ["body", "cleanText", "comment"], {
+    const p = removeMatch([parsed], toRemove, {
       removeInstances: true,
     });
     assert.deepStrictEqual(
       p,
-      removeMatch([parsedOutput], ["body", "cleanText", "comment"], {
+      removeMatch([parsedOutput], toRemove, {
         removeInstances: true,
       })
     );
