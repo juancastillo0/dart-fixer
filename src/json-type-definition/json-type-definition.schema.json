@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$ref": "#/definitions/JsonTypeDefinition",
+  "definitions": {
+    "JsonTypeDefinition": {
+      "type": "object",
+      "properties": {
+        "nullable": {
+          "type": "boolean",
+          "description": "Whether the given type can be nullable."
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional properties that you would like to associate with the type definition.",
+          "additionalProperties": true
+        },
+        "definitions": {
+          "type": "object",
+          "description": "Other type definition that can be referenced with the 'ref' property.",
+          "additionalProperties": { "$ref": "#/definitions/JsonTypeDefinition" }
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "A reference to another type in the 'definitions' object of the file.",
+          "required": ["ref"],
+          "properties": {
+            "ref": {
+              "description": "The key of the 'definitions' object in the schema that points to the type definition.",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "A primitive type.",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "description": "The type of the primitive value.",
+              "type": "string",
+              "enum": [
+                "float32",
+                "float64",
+                "int8",
+                "uint8",
+                "int16",
+                "uint16",
+                "int32",
+                "uint32",
+                "string",
+                "timestamp",
+                "boolean"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "String whose possible values are in the 'enum' array.",
+          "required": ["enum"],
+          "properties": {
+            "enum": {
+              "description": "The possible values that this type allows.",
+              "type": "array",
+              "items": { "type": "string" },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Array whose elements follow the 'elements' property.",
+          "required": ["elements"],
+          "properties": {
+            "elements": {
+              "description": "The type definition of the elements in the array.",
+              "$ref": "#/definitions/JsonTypeDefinition"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Object whose values follow the 'values' property.",
+          "required": ["values"],
+          "properties": {
+            "values": {
+              "description": "The type definition of the values in the object.",
+              "$ref": "#/definitions/JsonTypeDefinition"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Discriminated union.",
+          "required": ["discriminator", "mapping"],
+          "properties": {
+            "discriminator": {
+              "description": "The key name that will be used to distinguish the variant of instances for the union.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "mapping": {
+              "description": "The variants of the union. The key for the variant should be equal to the value of the discriminator property.",
+              "type": "object",
+              "minProperties": 2,
+              "additionalProperties": {
+                "$ref": "#/definitions/JsonTypeDefinition"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Object with named properties.",
+          "anyOf": [
+            { "required": ["properties"] },
+            { "required": ["optionalProperties"] }
+          ],
+          "properties": {
+            "properties": {
+              "description": "The required properties in the object.",
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/JsonTypeDefinition"
+              }
+            },
+            "optionalProperties": {
+              "description": "The optional properties in the object.",
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/JsonTypeDefinition"
+              }
+            },
+            "additionalProperties": {
+              "description": "Whether the object can contain additional properties.",
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Empty object, matches any JSON value.",
+          "maxProperties": 0,
+          "minProperties": 0
+        }
+      ]
+    }
+  }
+}

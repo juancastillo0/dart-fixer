@@ -1,0 +1,115 @@
+{
+  "ref": "JsonTypeDefinition",
+  "definitions": {
+    "JsonTypeDefinition": {
+      "optionalProperties": {
+        "nullable": {
+          "metadata": {
+            "description": "Whether the given type can be nullable."
+          },
+          "type": "boolean"
+        },
+        "metadata": {
+          "metadata": {
+            "description": "Additional properties that you would like to associate with the type definition."
+          },
+          "values": {}
+        },
+        "definitions": {
+          "metadata": {
+            "description": "Other type definition that can be referenced with the 'ref' property."
+          },
+          "values": { "ref": "JsonTypeDefinition" }
+        },
+
+        "ref": {
+          "metadata": {
+            "description": "The key of the 'definitions' object in the schema that points to the type definition."
+          },
+          "type": "string"
+        },
+
+        "type": {
+          "metadata": { "description": "The type of the primitive value." },
+          "enum": [
+            "float32",
+            "float64",
+            "int8",
+            "uint8",
+            "int16",
+            "uint16",
+            "int32",
+            "uint32",
+            "string",
+            "timestamp",
+            "boolean"
+          ]
+        },
+
+        "enum": {
+          "metadata": {
+            "description": "The possible values that this type allows."
+          },
+          "elements": { "type": "string" }
+        },
+
+        "elements": {
+          "metadata": {
+            "description": "The type definition of the elements in the array."
+          },
+          "ref": "JsonTypeDefinition"
+        },
+
+        "values": {
+          "metadata": {
+            "description": "The type definition of the values in the object."
+          },
+          "ref": "JsonTypeDefinition"
+        },
+
+        "properties": {
+          "metadata": {
+            "description": "The required properties in the object."
+          },
+
+          "values": {
+            "ref": "JsonTypeDefinition"
+          }
+        },
+        "optionalProperties": {
+          "metadata": {
+            "description": "The optional properties in the object."
+          },
+
+          "values": {
+            "ref": "JsonTypeDefinition"
+          }
+        },
+        "additionalProperties": {
+          "metadata": {
+            "description": "Whether the object can contain additional properties.",
+            "default": false
+          },
+          "type": "boolean"
+        },
+
+        "discriminator": {
+          "metadata": {
+            "description": "The key name that will be used to distinguish the variant of instances for the union.",
+            "minLength": 1
+          },
+          "type": "string"
+        },
+        "mapping": {
+          "metadata": {
+            "description": "The variants of the union. The key for the variant should be equal to the value of the discriminator property.",
+            "minProperties": 2
+          },
+          "values": {
+            "ref": "JsonTypeDefinition"
+          }
+        }
+      }
+    }
+  }
+}
