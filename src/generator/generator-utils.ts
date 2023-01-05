@@ -3,14 +3,17 @@ import { DartAnalyzer } from "../dart-base/analyzer";
 import { DartModelPrinter } from "../dart-base/dart-model-printer";
 import { dartTypeFromJsonSchema } from "../json-schema/dart-from-schema";
 import { quicktypeJSON } from "../json-schema/schema-from-document";
-import { SomeJSONSchema } from "../json-schema/schema-type";
 import {
   dartTypeFromJsonTypeDefinition,
   JsonSchemaCtx,
 } from "../json-type-definition/dart-from-json";
-import { SomeJTDSchemaType } from "../json-type-definition/schema-type";
 import { ClassGenerator } from "./generator";
 import { createHash } from "crypto";
+import {
+  jsonSchemaValidator,
+  jsonTypeDefinitionValidator,
+  parseYamlOrJson,
+} from "../utils";
 
 export interface GeneratedSection {
   md5Hash: string;
@@ -79,17 +82,26 @@ export const createDartModelFromJSON = async (
   const { identifierName } = nameFromFile(newFile);
   const path = [identifierName];
 
+  const documentInfo = {
+    uri: document.jsonFile,
+    getText: () => document.text,
+  };
   let ctx: JsonSchemaCtx;
   switch (kind) {
     case JsonFileKind.typeDefinition: {
-      ctx = dartTypeFromJsonTypeDefinition(
-        JSON.parse(text) as SomeJTDSchemaType,
-        path
-      ).ctx;
+      const value = parseYamlOrJson(documentInfo);
+      if (!jsonTypeDefinitionValidator.validate(value)) {
+        throw new Error(jsonTypeDefinitionValidator.getErrorMessage());
+      }
+      ctx = dartTypeFromJsonTypeDefinition(value, path).ctx;
       break;
     }
     case JsonFileKind.schema: {
-      ctx = dartTypeFromJsonSchema(JSON.parse(text) as SomeJSONSchema, path);
+      const value = parseYamlOrJson(documentInfo);
+      if (!jsonSchemaValidator.validate(value)) {
+        throw new Error(jsonSchemaValidator.getErrorMessage());
+      }
+      ctx = dartTypeFromJsonSchema(value, path);
       break;
     }
     case JsonFileKind.document: {

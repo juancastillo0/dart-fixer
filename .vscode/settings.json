@@ -20,6 +20,7 @@
         "pubspec",
         "quickfix",
         "quicktype",
-        "recase"
+        "recase",
+        "typedefs"
     ]
 }
