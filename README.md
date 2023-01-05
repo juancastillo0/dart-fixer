@@ -4,15 +4,23 @@
 [![dart-fixer is released under the MIT license.](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/juancastillo0/dart-fixer/blob/main/LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](#contributing)
 
+# dart-fixer VSCode Extension and Libraries
 
-- [dart-fixer](#dart-fixer)
+This extension provides various utilities for working with Dart models, [JSON schemas](https://json-schema.org), [JSON type definitions](https://jsontypedef.com), and Dart or Markdown documentation.
+
+# Table of Contents
+
+- [dart-fixer VSCode Extension and Libraries](#dart-fixer-vscode-extension-and-libraries)
+- [Table of Contents](#table-of-contents)
+- [Example Workspace](#example-workspace)
 - [Features](#features)
-  - [Dart model, JSON Schema and JSON Type Definition](#dart-model-json-schema-and-json-type-definition)
+  - [Dart models, JSON Schema and JSON Type Definition](#dart-models-json-schema-and-json-type-definition)
+    - [Model mappings](#model-mappings)
     - [JSON Schema vs JSON Type Definition](#json-schema-vs-json-type-definition)
   - [Documentation and example snippet synchronization](#documentation-and-example-snippet-synchronization)
-    - [Markdown and Dart Documentation Comments](#markdown-and-dart-documentation-comments)
-    - [Dart Code](#dart-code)
-  - [Dart Model utilities generation](#dart-model-utilities-generation)
+    - [Markdown and Dart documentation comments](#markdown-and-dart-documentation-comments)
+    - [Dart code](#dart-code)
+  - [Dart model utilities generation](#dart-model-utilities-generation)
     - [fromJson factory](#fromjson-factory)
     - [toJson method](#tojson-method)
     - [equality operator and hashCode getter](#equality-operator-and-hashcode-getter)
@@ -21,6 +29,8 @@
     - [allFields getter](#allfields-getter)
     - [field enum](#field-enum)
     - [builder class](#builder-class)
+- [Commands](#commands)
+  - [Code Actions](#code-actions)
 - [Requirements](#requirements)
 - [Extension Settings](#extension-settings)
 - [Known Issues](#known-issues)
@@ -28,14 +38,15 @@
   - [1.0.0](#100)
 - [Contributing](#contributing)
   - [Linting](#linting)
+  - [Formatting](#formatting)
   - [Run Extension](#run-extension)
   - [Test Extension](#test-extension)
     - [Test Workspace](#test-workspace)
   - [Following extension guidelines](#following-extension-guidelines)
 
-# dart-fixer
+# Example Workspace
 
-This extension provides various utilities for working with Dart models, JSON schemas, and Dart or Markdown documentation.
+You may find the [test_workspace](./test_workspace/) useful for usage and configuration examples in a Dart project.
 
 # Features
 
@@ -47,11 +58,16 @@ For example if there is an image subfolder under your extension project workspac
 
 > Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
 
-
-## Dart model, JSON Schema and JSON Type Definition
+## Dart models, JSON Schema and JSON Type Definition
 
 - Generates Dart classes from [JSON Schema](https://json-schema.org/) or [JSON Type Definition](https://jsontypedef.com/) files.
 - Generates JSON Schema or JSON Type Definition files from Dart classes.
+
+You may generate Dart classes or JSON schemas by using [commands](#commands) or with the [Model mappings configuration](#model-mappings).
+
+### Model mappings
+
+A model mapping configuration specifies the input and output paths and the type of files (JSON schemas, Dart classes) that the code generation should parse and generate.
 
 ### JSON Schema vs JSON Type Definition
 
@@ -61,7 +77,7 @@ We support both types of schema, as input or output of the extension. For a disc
 
 This extension provides a way to keep code or documentation snippets synchronized automatically. This may be useful if you want to use the same documentation from you code in a Markdown (`.md`) file or you may what to use your test code as an example snippet in your code's documentation or README file (or any Markdown).
 
-### Markdown and Dart Documentation Comments
+### Markdown and Dart documentation comments
 
 You may define snippets with the `snippet-define` comment in a Markdown file:
 
@@ -93,7 +109,7 @@ After generation the Dart comment will look like this, with the last two lines g
 /// <!-- snippet-include-end:name -->
 ```
 
-### Dart Code
+### Dart code
 
 You may also define snippets from Dart code:
 
@@ -115,7 +131,7 @@ which will be included within "\`\`\`dart" code section in the Markdown:
 /// <!-- snippet-include-end:name -->
 ```
 
-## Dart Model utilities generation
+## Dart model utilities generation
 
 Multiple utilities can be generated from Dart classes. These include utilities for serialization and de-serialization (toJson and fromJson), data class or equality/immutable methods (copyWith, equality, hashCode, Builder class), other utilities such as an enum and getter for all fields in the class.
 
@@ -153,7 +169,7 @@ Generates a `String toString()` method override that returns a String with all t
 
 ### allFields getter
 
-Generates a `List<Object?> get allFields` getter that returns the values for all fields.
+Generates a `List<Object?> get props` getter that returns the values for all fields.
 
 ### field enum
 
@@ -162,6 +178,22 @@ Generates a `enum ModelField` with all the fields in the class. The enum contain
 ### builder class
 
 Generates a `class ModelBuilder` with utilities for editing and setting fields and creating new instances of the Model from the values. Can be used to create instances of `Model`, it's an alternative to the `copyWith` method.
+
+# Commands
+
+| Command                   | Description                                                      | Configuration                                    |
+| ------------------------- | ---------------------------------------------------------------- | ------------------------------------------------ |
+| findAllErrors             | Analyses all the code and shows all errors as vscode diagnostics | N/A                                              |
+| fixAllErrors              | Fixes all errors found by this extension                         | N/A                                              |
+| dartModelFromJTD          | Generates a Dart file from a JSON Type Definition file           | The default generator configuration will be used |
+| dartModelFromJsonSchema   | Generates a Dart file from a JSON Schema file                    | The default generator configuration will be used |
+| dartModelFromJsonDocument | Generates a Dart file from a JSON Type Definition file           | The default generator configuration will be used |
+
+## Code Actions
+
+For all error diagnostics we provide a Quick Fix Code Action. You can fix them individually using the vscode interface or with the `fixAllErrors` command.
+
+A code action will appear por JSON documents, for which you can generate Dart classes, similar to the commands. The extension of the JSON file will determine the type of schema that will be parsed: JSON Schema (`.schema.json`), JSON Type Definition (`.jtd.json`) or a JSON document (`.json`) with an instance of the class.
 
 # Requirements
 
@@ -194,7 +226,7 @@ Added features X, Y, and Z.
 
 # Contributing
 
-Install the packages
+Fork the repository and install the packages:
 
 ```bash
 npm i
@@ -204,15 +236,25 @@ npm i
 
 We use ESLint for static analysis of the code. You may want to install the [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) extension for vscode.
 
+The `npm run eslint` command (run in CI) will execute the ESLint static analysis verification.
+
+## Formatting
+
+We use Prettier for formatting the code. You may want to install the [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) extension for vscode.
+
+The `npm run prettier` command will fix the formatting issues.
+
+The `npm run prettier-check` command (run in CI) will execute the prettier verification.
+
 ## Run Extension
 
-You may run the `Run Extension` vscode task in the `launch.json` configuration. This will open a new window with the extension set up. If you make changes to the extension source code, you will need to reload the opened Extension Development Host vscode window for it to use the new implementation.
+You may run the `Run Extension` vscode task set up in the `launch.json` configuration. This will open a new window with the extension running. If you make changes to the extension source code, you will need to reload the opened Extension Development Host vscode window for it to use the new implementation.
 
 ## Test Extension
 
 You may run the vscode tasks in the `launch.json` configuration.
 
-- `Extension Test` for the extension integration tests.
+- `Extension Test` for the vscode extension integration tests.
 - `mocha test` for tests that do not require the vscode library to run. 
 You may have to configure your node.js path with the `mochaExplorer.nodePath` if using the [Mocha Test Explorer extension](https://marketplace.visualstudio.com/items?itemName=hbenl.vscode-mocha-test-adapter).
 
