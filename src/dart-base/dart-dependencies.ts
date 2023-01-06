@@ -39,7 +39,7 @@ export const getDartPackageData = async (
   const pubspecs = await fsControl.findFiles("pubspec.yaml");
   for (const pubspec of pubspecs) {
     const content = await fsControl.openTextDocument(pubspec);
-    const data = parsePubspec(content.getText());
+    const data = parsePubspec(content.text);
     if (data) {
       result.set(pubspec, data);
     }

@@ -18,6 +18,8 @@ import { GenerationOptions } from "../generator/generator-config";
 import * as path from "path";
 import * as minimatch from "minimatch";
 import { getDefaultGeneratorConfig } from "../extension-config";
+import { CleanedText, cleanRawText, TextPosition } from "./parser-utils";
+import { FileExtensionInfo, getFileType } from "./file-system";
 
 // https://stackoverflow.com/questions/69333492/vscode-create-a-document-in-memory-with-uri-for-automated-testing
 export abstract class FileSystemManager {
@@ -35,7 +37,11 @@ class FileSystemMockImpl implements FileSystemManager {
   openTextDocument(documentPath: string): Promise<TextDocument> {
     let value = this.values.get(documentPath);
     if (!value) {
-      value = { getText: () => "", uri: documentPath, version: 0 };
+      value = new TextDocument({
+        text: "",
+        uri: documentPath,
+        version: 0,
+      });
       this.values.set(documentPath, value);
     }
     return Promise.resolve(value);
@@ -48,15 +54,37 @@ class FileSystemMockImpl implements FileSystemManager {
   }
 }
 
-export interface TextDocument {
-  getText: () => string;
+export interface Range {
+  start: TextPosition;
+  end: TextPosition;
+}
+
+export class TextDocument {
+  text: string;
   uri: string;
   version: number;
+  fileExtension: FileExtensionInfo;
+  private cleanedText: CleanedText;
+
+  constructor(args: { text: string; uri: string; version: number }) {
+    this.text = args.text;
+    this.uri = args.uri;
+    this.version = args.version;
+    this.cleanedText = cleanRawText(this.text, []);
+    this.fileExtension = getFileType(this.uri);
+  }
+
+  public get filename(): string {
+    return this.uri.substring(this.uri.lastIndexOf("/") + 1);
+  }
+
+  positionAt = (index: number): TextPosition => {
+    return this.cleanedText.mapIndex(index);
+  };
 }
 
 export interface ParsedDartFile {
-  version: number;
-  text: string;
+  document: TextDocument;
   data: ParsedDartFileData;
 }
 
@@ -109,15 +137,10 @@ export class DartAnalyzer {
 
     // update cache
     const promises: Array<Promise<unknown>> = [];
-    for (const [file, data] of this.cache) {
+    for (const [, data] of this.cache) {
       if (!data.data.pubSpecInfo || data.data.pubSpecInfo.uri === uri) {
-        promises.push(
-          this.getData({
-            getText: () => data.text,
-            version: data.version,
-            uri: file,
-          })
-        );
+        // TODO: update version
+        promises.push(this.getData(data.document));
       }
     }
     await Promise.all(promises);
@@ -249,7 +272,7 @@ export class DartAnalyzer {
     const previousData = this.cache.get(document.uri.toString());
 
     let data = previousData?.data;
-    if (data && previousData!.version >= document.version) {
+    if (data && previousData!.document.version >= document.version) {
       return { didChange: false, data };
     }
     const processing = this._processing.get(document.uri);
@@ -263,7 +286,7 @@ export class DartAnalyzer {
 
     try {
       const packageName = pubSpecDataE?.data?.name;
-      const text = document.getText();
+      const text = document.text;
       const values = parseClassesAntlr(text, {
         packageName,
       });
@@ -305,8 +328,7 @@ export class DartAnalyzer {
           this.globalConfig,
       };
       this.cache.set(document.uri.toString(), {
-        version: document.version,
-        text,
+        document,
         data,
       });
       resolve({ didChange: true, data });

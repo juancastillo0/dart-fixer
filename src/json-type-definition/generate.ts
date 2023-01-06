@@ -23,7 +23,7 @@ export const generateOutput = async (
     const dartFileText = await createDartModelFromJSON(
       {
         newFile: params.outputFile,
-        text: document.getText(),
+        text: document.text,
         jsonFile: document.uri,
       },
       params.inputKind,

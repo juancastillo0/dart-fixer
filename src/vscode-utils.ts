@@ -7,11 +7,11 @@ import { GeneratedSection } from "./generator/generator-utils";
 export class VsCodeFileSystem implements FileSystemManager {
   async openTextDocument(path: string): Promise<TextDocument> {
     const value = await vscode.workspace.openTextDocument(path);
-    return {
-      getText: () => value.getText(),
+    return new TextDocument({
+      text: value.getText(),
       uri: pathFromUri(value.uri),
       version: value.version,
-    };
+    });
   }
 
   async findFiles(glob: string): Promise<Array<string>> {
@@ -21,11 +21,12 @@ export class VsCodeFileSystem implements FileSystemManager {
 
 export const textDocumentFromVsCode = (
   document: vscode.TextDocument
-): TextDocument => ({
-  getText: () => document.getText(),
-  uri: pathFromUri(document.uri),
-  version: document.version,
-});
+): TextDocument =>
+  new TextDocument({
+    text: document.getText(),
+    uri: pathFromUri(document.uri),
+    version: document.version,
+  });
 
 export const createOutOfDateDiagnostic = (
   document: vscode.TextDocument,

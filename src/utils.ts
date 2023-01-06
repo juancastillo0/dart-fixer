@@ -115,14 +115,14 @@ const validateFunction = <T>(
 };
 
 export const parseYamlOrJson = (doc: {
-  getText: () => string;
+  text: string;
   uri: string;
 }): unknown => {
   let data: unknown;
   if (doc.uri.match(/\.(yaml|yml)$/)) {
-    data = yaml.parse(doc.getText());
+    data = yaml.parse(doc.text);
   } else {
-    data = JSON5.parse(doc.getText());
+    data = (JSON5 as { parse: (text: string) => unknown }).parse(doc.text);
   }
   return data;
 };

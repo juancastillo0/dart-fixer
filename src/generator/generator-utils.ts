@@ -1,5 +1,5 @@
 import { CleanedText, TextPosition } from "../dart-base/parser-utils";
-import { DartAnalyzer } from "../dart-base/analyzer";
+import { DartAnalyzer, TextDocument } from "../dart-base/analyzer";
 import { DartModelPrinter } from "../dart-base/dart-model-printer";
 import { dartTypeFromJsonSchema } from "../json-schema/dart-from-schema";
 import { quicktypeJSON } from "../json-schema/schema-from-document";
@@ -84,7 +84,7 @@ export const createDartModelFromJSON = async (
 
   const documentInfo = {
     uri: document.jsonFile,
-    getText: () => document.text,
+    text: document.text,
   };
   let ctx: JsonSchemaCtx;
   switch (kind) {
@@ -124,11 +124,13 @@ export const createDartModelFromJSON = async (
 
   let dartFileText = generateDartFileFromJsonData(params);
   if (analyzer) {
-    const value = await analyzer.getData({
-      getText: () => dartFileText.text,
-      uri: newFile,
-      version: 0,
-    });
+    const value = await analyzer.getData(
+      new TextDocument({
+        text: dartFileText.text,
+        uri: newFile,
+        version: 0,
+      })
+    );
     if (!value.error) {
       dartFileText = generateDartFileFromJsonData(params);
     }
