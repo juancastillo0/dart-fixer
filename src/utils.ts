@@ -8,7 +8,8 @@ import * as JSONSchemaSchema_ from "./json-schema/json-schema.schema.json";
 import * as JSONTypeDefSchema_ from "./json-type-definition/json-type-definition.schema.json";
 import { camelCase, constantCase, pascalCase, snakeCase } from "change-case";
 import * as yaml from "yaml";
-import * as JSON5 from "json5";
+// @ts-expect-error https://github.com/json5/json5/issues/240
+import JSON5 from "json5/dist/index.mjs";
 import { JSONSchemaType } from "./json-schema/schema-type";
 import { JTDSchemaType } from "./json-type-definition/schema-type";
 
