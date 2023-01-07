@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { FileSystemManager, TextDocument } from "./dart-base/analyzer";
+import { FileSystemManager, TextDocument } from "./dart-base/file-system";
 import { Path } from "./dart-base/dart-dependencies";
 import { EXTENSION_NAME } from "./extension";
 import {

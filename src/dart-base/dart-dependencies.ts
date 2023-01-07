@@ -1,7 +1,7 @@
 import { DartImport } from "./parser";
 import * as fs from "fs";
 import * as yaml from "yaml";
-import { FileSystemManager } from "./analyzer";
+import { FileSystemManager } from "./file-system";
 import * as path from "path";
 import { ExtensionConfig, extensionConfigValidate } from "../extension-config";
 

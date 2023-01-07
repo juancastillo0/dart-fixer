@@ -1,6 +1,95 @@
 import * as glob from "glob";
 import * as fs from "fs/promises";
-import { FileSystemManager, TextDocument } from "./analyzer";
+import * as minimatch from "minimatch";
+import { CleanedText, cleanRawText, TextPosition } from "./parser-utils";
+
+export interface Range {
+  start: TextPosition;
+  end: TextPosition;
+}
+
+export class TextDocument {
+  text: string;
+  uri: string;
+  version: number;
+  fileExtension: FileExtensionInfo;
+  private cleanedText: CleanedText;
+
+  constructor(args: { text: string; uri: string; version: number }) {
+    this.text = args.text;
+    this.uri = args.uri;
+    this.version = args.version;
+    this.cleanedText = cleanRawText(this.text, []);
+    this.fileExtension = getFileType(this.uri);
+  }
+
+  public get filename(): string {
+    return this.uri.substring(this.uri.lastIndexOf("/") + 1);
+  }
+
+  positionAt = (index: number): TextPosition => {
+    return this.cleanedText.mapIndex(index);
+  };
+}
+
+// https://stackoverflow.com/questions/69333492/vscode-create-a-document-in-memory-with-uri-for-automated-testing
+export abstract class FileSystemManager {
+  abstract openTextDocument(path: string): Promise<TextDocument>;
+  abstract findFiles(glob: string): Promise<Array<string>>;
+
+  static fromMap(values: Map<string, TextDocument>): FileSystemManager {
+    return new FileSystemMockImpl(values);
+  }
+
+  static fromDirectory(directory: string): FileSystemManager {
+    return new FileSystemForDirectory(directory);
+  }
+}
+
+class FileSystemMockImpl implements FileSystemManager {
+  constructor(public values: Map<string, TextDocument>) {}
+
+  openTextDocument(documentPath: string): Promise<TextDocument> {
+    let value = this.values.get(documentPath);
+    if (!value) {
+      value = new TextDocument({
+        text: "",
+        uri: documentPath,
+        version: 0,
+      });
+      this.values.set(documentPath, value);
+    }
+    return Promise.resolve(value);
+  }
+
+  findFiles(globString: string): Promise<Array<string>> {
+    return Promise.resolve(
+      [...this.values.keys()].filter((v) => minimatch(globString, v))
+    );
+  }
+}
+
+class FileSystemForDirectory implements FileSystemManager {
+  constructor(public workingDirectory: string) {}
+
+  async openTextDocument(documentPath: string): Promise<TextDocument> {
+    let content = await fs.readFile(documentPath, { encoding: "utf8" });
+    if (!content) {
+      await fs.writeFile(documentPath, "", { encoding: "utf8" });
+      content = "";
+    }
+    const value = new TextDocument({
+      text: content,
+      uri: documentPath,
+      version: 0,
+    });
+    return Promise.resolve(value);
+  }
+
+  findFiles(globStr: string): Promise<Array<string>> {
+    return glob.__promisify__(globStr, { cwd: this.workingDirectory });
+  }
+}
 
 export enum SchemaKind {
   typeDef = "typeDef",
@@ -56,25 +145,3 @@ export const getFileType = (filename: string): FileExtensionInfo => {
 
   return { extension, kind, schemaKind };
 };
-
-export class FileSystemForDirectory implements FileSystemManager {
-  constructor(public workingDirectory: string) {}
-
-  async openTextDocument(documentPath: string): Promise<TextDocument> {
-    let content = await fs.readFile(documentPath, { encoding: "utf8" });
-    if (!content) {
-      await fs.writeFile(documentPath, "", { encoding: "utf8" });
-      content = "";
-    }
-    const value = new TextDocument({
-      text: content,
-      uri: documentPath,
-      version: 0,
-    });
-    return Promise.resolve(value);
-  }
-
-  findFiles(globStr: string): Promise<Array<string>> {
-    return glob.__promisify__(globStr, { cwd: this.workingDirectory });
-  }
-}

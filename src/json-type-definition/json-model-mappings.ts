@@ -1,5 +1,6 @@
 import * as path from "path";
-import { DartAnalyzer, TextDocument } from "../dart-base/analyzer";
+import { DartAnalyzer } from "../dart-base/analyzer";
+import { TextDocument } from "../dart-base/file-system";
 import { ModelMappingConfig } from "../extension-config";
 import {
   createDartModelFromJSON,
