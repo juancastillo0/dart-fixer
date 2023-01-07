@@ -1,5 +1,5 @@
 import { CleanedText, TextPosition } from "../dart-base/parser-utils";
-import { DartAnalyzer, TextDocument } from "../dart-base/analyzer";
+import { DartAnalyzer, Range, TextDocument } from "../dart-base/analyzer";
 import { DartModelPrinter } from "../dart-base/dart-model-printer";
 import { dartTypeFromJsonSchema } from "../json-schema/dart-from-schema";
 import { quicktypeJSON } from "../json-schema/schema-from-document";
@@ -231,3 +231,13 @@ export const getCommentGeneratedDartFromJson = (
   }
   return undefined;
 };
+
+export interface ReplaceCodeAction {
+  document: TextDocument;
+  text: string;
+  name: string;
+  diagnostic?: {
+    message: string;
+    range?: Range;
+  };
+}

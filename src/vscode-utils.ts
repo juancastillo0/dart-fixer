@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import { FileSystemManager, TextDocument } from "./dart-base/analyzer";
 import { Path } from "./dart-base/dart-dependencies";
 import { EXTENSION_NAME } from "./extension";
-import { GeneratedSection } from "./generator/generator-utils";
+import {
+  GeneratedSection,
+  ReplaceCodeAction,
+} from "./generator/generator-utils";
 
 export class VsCodeFileSystem implements FileSystemManager {
   async openTextDocument(path: string): Promise<TextDocument> {
@@ -97,4 +100,40 @@ export const formatFiles = async (
       return undefined;
     })
   );
+};
+
+export const makeReplaceContentAction = (
+  args: ReplaceCodeAction
+): vscode.CodeAction => {
+  const document = args.document;
+  const action = new vscode.CodeAction(
+    args.name,
+    vscode.CodeActionKind.QuickFix
+  );
+  action.isPreferred = true;
+  action.edit = new vscode.WorkspaceEdit();
+  const end = document.positionAt(document.text.length);
+  action.edit.replace(
+    vscode.Uri.parse(document.uri),
+    new vscode.Range(0, 0, end.line, end.column),
+    args.text
+  );
+  if (args.diagnostic) {
+    const range = args.diagnostic.range;
+    action.diagnostics = [
+      new vscode.Diagnostic(
+        range
+          ? new vscode.Range(
+              range.start.line,
+              range.start.column,
+              range.end.line,
+              range.end.column
+            )
+          : new vscode.Range(0, 0, 1, 0),
+        args.diagnostic.message,
+        vscode.DiagnosticSeverity.Error
+      ),
+    ];
+  }
+  return action;
 };
