@@ -1,6 +1,6 @@
 import * as glob from "glob";
 import * as fs from "fs/promises";
-import * as minimatch from "minimatch";
+import minimatch = require("minimatch");
 import { CleanedText, cleanRawText, TextPosition } from "./parser-utils";
 
 export interface Range {

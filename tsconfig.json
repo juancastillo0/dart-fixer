@@ -17,6 +17,7 @@
 		"noImplicitThis": true,
 		"noImplicitAny": true,
 		"alwaysStrict": true,
-		"resolveJsonModule": true
+		"resolveJsonModule": true,
+        "esModuleInterop": true
 	}
 }
