@@ -73,15 +73,17 @@ export class JsonSchemaFromDart {
         enum: dartType.entries.map((e) => e.name),
       };
     } else {
+      // TODO: configurable
+      const fields = dartType.fieldsNotStatic.filter(
+        (f) => !f.name.startsWith("_")
+      );
       const value = {
         type: "object",
-        properties: dartType.fieldsNotStatic.reduce<
-          Record<string, JSONSchemaT>
-        >((p, f) => {
+        properties: fields.reduce<Record<string, JSONSchemaT>>((p, f) => {
           p[f.name] = this.jsonTypeFromField(f);
           return p;
         }, {}),
-        required: dartType.fieldsNotStatic
+        required: fields
           .filter((f) => !f.type?.endsWith("?"))
           .map((f) => f.name),
       };

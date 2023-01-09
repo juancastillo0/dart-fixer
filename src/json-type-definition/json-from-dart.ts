@@ -60,14 +60,18 @@ export class JsonTypeDefFromDart {
         enum: dartType.entries.map((e) => e.name),
       };
     } else {
+      // TODO: configurable
+      const fields = dartType.fieldsNotStatic.filter(
+        (f) => !f.name.startsWith("_")
+      );
       result = {
-        properties: dartType.fieldsNotStatic
+        properties: fields
           .filter((f) => !f.type?.endsWith("?"))
           .reduce<Record<string, SomeJTDSchemaType>>((p, a) => {
             p[a.name] = this.jsonTypeFromField(a);
             return p;
           }, {}),
-        optionalProperties: dartType.fieldsNotStatic
+        optionalProperties: fields
           .filter((f) => f.type && !f.type.endsWith("?"))
           .reduce<Record<string, SomeJTDSchemaType>>((p, a) => {
             p[a.name] = this.jsonTypeFromField(a);

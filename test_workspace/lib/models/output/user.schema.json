@@ -14,15 +14,8 @@
       "type": "object",
       "properties": {
         "nameIsSet": { "type": "boolean" },
-        "_name": { "type": "string", "nullable": true },
         "idIsSet": { "type": "boolean" },
-        "_id": { "type": "integer", "nullable": true },
-        "values3IsSet": { "type": "boolean" },
-        "_values3": {
-          "type": "array",
-          "items": { "type": "string" },
-          "nullable": true
-        }
+        "values3IsSet": { "type": "boolean" }
       },
       "required": ["nameIsSet", "idIsSet", "values3IsSet"]
     },
@@ -31,7 +24,7 @@
   "metadata": {
     "dartFixer": {
       "sourceDartFile": "/Users/juanmanuelcastillo/Desktop/flutter/dart-fixer/test_workspace/lib/models/input/user.dart",
-      "md5Hash": "RHC+bDWFt4XPJyRerF7Vug==",
+      "md5Hash": "WNO0kpDNvohW4AtO+0P98A==",
       "outputKind": "schema"
     }
   }
