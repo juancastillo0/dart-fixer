@@ -43,8 +43,10 @@ interface StringKeywords {
 }
 
 type UncheckedJSONSchemaType<T, IsPartial extends boolean> = (
-  | // these two unions allow arbitrary unions of types
-  {
+  | // reference
+  { $ref: string }
+  // these two unions allow arbitrary unions of types
+  | {
       anyOf: readonly UncheckedJSONSchemaType<T, IsPartial>[];
     }
   | {

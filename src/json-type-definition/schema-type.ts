@@ -14,18 +14,50 @@ type NumberType =
 type StringType = "string" | "timestamp";
 
 /** Generic JTD Schema without inference of the represented type */
-export type SomeJTDSchemaType = (
+export type SomeJTDSchemaType =
   | // ref
-  { ref: string }
+  SomeJTDSchemaTypeRef
   // primitives
-  | { type: NumberType | StringType | "boolean" }
+  | SomeJTDSchemaTypePrimitive
   // enum
-  | { enum: Array<string> }
+  | SomeJTDSchemaTypeEnum
   // elements
-  | { elements: SomeJTDSchemaType }
+  | SomeJTDSchemaTypeArray
   // values
-  | { values: SomeJTDSchemaType }
+  | SomeJTDSchemaTypeMap
   // properties
+  | SomeJTDSchemaTypeObject
+  // discriminator
+  | SomeJTDSchemaTypeUnion
+  // empty
+  // NOTE see the end of
+  // https://github.com/typescript-eslint/typescript-eslint/issues/2063#issuecomment-675156492
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | SomeJTDSchemaTypeBase;
+export interface SomeJTDSchemaTypeBase {
+  nullable?: boolean;
+  metadata?: Record<string, unknown>;
+  definitions?: Record<string, SomeJTDSchemaType>;
+}
+
+export type SomeJTDSchemaTypeRef = { ref: string } & SomeJTDSchemaTypeBase;
+export type SomeJTDSchemaTypePrimitive = {
+  type: NumberType | StringType | "boolean";
+} & SomeJTDSchemaTypeBase;
+export type SomeJTDSchemaTypeEnum = {
+  enum: Array<string>;
+} & SomeJTDSchemaTypeBase;
+export type SomeJTDSchemaTypeArray = {
+  elements: SomeJTDSchemaType;
+} & SomeJTDSchemaTypeBase;
+export type SomeJTDSchemaTypeMap = {
+  values: SomeJTDSchemaType;
+} & SomeJTDSchemaTypeBase;
+export type SomeJTDSchemaTypeUnion = {
+  discriminator: string;
+  mapping: Record<string, SomeJTDSchemaType>;
+} & SomeJTDSchemaTypeBase;
+export type SomeJTDSchemaTypeObject = (
   | {
       properties: Record<string, SomeJTDSchemaType>;
       optionalProperties?: Record<string, SomeJTDSchemaType>;
@@ -36,18 +68,8 @@ export type SomeJTDSchemaType = (
       optionalProperties: Record<string, SomeJTDSchemaType>;
       additionalProperties?: boolean;
     }
-  // discriminator
-  | { discriminator: string; mapping: Record<string, SomeJTDSchemaType> }
-  // empty
-  // NOTE see the end of
-  // https://github.com/typescript-eslint/typescript-eslint/issues/2063#issuecomment-675156492
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  | {}
-) & {
-  nullable?: boolean;
-  metadata?: Record<string, unknown>;
-  definitions?: Record<string, SomeJTDSchemaType>;
-};
+) &
+  SomeJTDSchemaTypeBase;
 
 /** required keys of an object, not undefined */
 type RequiredKeys<T> = {

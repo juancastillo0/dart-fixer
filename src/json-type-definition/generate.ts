@@ -78,7 +78,7 @@ export const dartModelsToJsonType = (
     }
     case JsonFileKind.typeDefinition: {
       const schema = new JsonTypeDefFromDart(allTypes);
-      value = schema.generateAll();
+      value = schema.generateAll() as Record<string, unknown>;
       break;
     }
   }
