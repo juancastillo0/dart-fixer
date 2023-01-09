@@ -42,6 +42,11 @@ export class JsonTypeDefinitionDartCodeActionProvider
     ],
   };
 
+  static readonly documentSelector: vscode.DocumentSelector = {
+    scheme: "file",
+    pattern: "**/*.{json,json5,jsonc,yaml,yml,dart}",
+  };
+
   async provideCodeActions(
     document: vscode.TextDocument
   ): Promise<Array<vscode.CodeAction>> {

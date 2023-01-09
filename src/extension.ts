@@ -112,7 +112,7 @@ export function activate(context: vscode.ExtensionContext): void {
   commentsCodeAction.subscribeToDocumentChanges(context);
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
-      { scheme: "file", pattern: "**/*.{dart,md,mdx}" },
+      CommentsCodeActions.documentSelector,
       commentsCodeAction,
       CommentsCodeActions.metadata
     )
@@ -148,7 +148,7 @@ export function activate(context: vscode.ExtensionContext): void {
   jsonCodeActions.subscribeToDocumentChanges(context);
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
-      { scheme: "file", pattern: "**/*.{json,dart}" },
+      JsonTypeDefinitionDartCodeActionProvider.documentSelector,
       jsonCodeActions,
       JsonTypeDefinitionDartCodeActionProvider.metadata
     )

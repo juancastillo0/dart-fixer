@@ -4,7 +4,6 @@ import Ajv, {
   ValidateFunction,
 } from "ajv/dist/jtd";
 import AjvJSONSchema, { JSONSchemaType as AjvJSONSchemaType } from "ajv";
-import * as JSONSchemaSchema_ from "./json-schema/json-schema.schema.json";
 import * as JSONTypeDefSchema_ from "./json-type-definition/json-type-definition.schema.json";
 import { camelCase, constantCase, pascalCase, snakeCase } from "change-case";
 import * as yaml from "yaml";
@@ -68,9 +67,6 @@ type ValidateResult<T> =
 const jsonTypeDefSchema = JSONTypeDefSchema_ as unknown as AjvJSONSchemaType<
   JTDSchemaType<unknown>
 >;
-const jsonSchemaSchema = JSONSchemaSchema_ as unknown as AjvJSONSchemaType<
-  JSONSchemaType<unknown>
->;
 
 export const jsonTypeDefinitionValidator = {
   validate: globalJSONSchemaAjv.compile(jsonTypeDefSchema),
@@ -78,8 +74,11 @@ export const jsonTypeDefinitionValidator = {
     return globalJSONSchemaAjv.errorsText(this.validate.errors);
   },
 };
+
 export const jsonSchemaValidator = {
-  validate: globalJSONSchemaAjv.compile(jsonSchemaSchema),
+  validate: globalJSONSchemaAjv.schemas[
+    "http://json-schema.org/draft-07/schema"
+  ]!.validate as ValidateFunction<JSONSchemaType<unknown>>,
   getErrorMessage(): string {
     return globalJSONSchemaAjv.errorsText(this.validate.errors);
   },

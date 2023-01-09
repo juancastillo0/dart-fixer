@@ -57,6 +57,11 @@ export class CommentsCodeActions implements vscode.CodeActionProvider {
     ],
   };
 
+  static readonly documentSelector: vscode.DocumentSelector = {
+    scheme: "file",
+    pattern: "**/*.{dart,md,mdx}",
+  };
+
   sections = new Map<
     string,
     {
