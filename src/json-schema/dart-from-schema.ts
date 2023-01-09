@@ -29,7 +29,7 @@ export const dartTypeFromJsonSchema = (
     typeById: new Map(),
     path,
   };
-  mapJsonSchemaType(ctx, schema);
+  mapJsonSchemaType(ctx, schema, { initial: true });
   return ctx;
 };
 
@@ -126,7 +126,8 @@ const mapJsonSchemaListType = (
 
 const mapJsonSchemaType = (
   ctx: JsonSchemaCtx,
-  schema: SomeJSONSchema & Partial<Nullable<EnumValue>>
+  schema: SomeJSONSchema & Partial<Nullable<EnumValue>>,
+  opts?: { initial?: boolean }
 ): DartClass | DartEnum | { name: string } => {
   if (schema.$ref && ctx.typeById.has(schema.$ref)) {
     const value = ctx.typeById.get(schema.$ref)!;
@@ -153,7 +154,13 @@ const mapJsonSchemaType = (
   );
   let result: DartClass | DartEnum | { name: string } | undefined;
 
-  if (!("type" in schema) || !schema.type) {
+  if ("enum" in schema && schema.enum) {
+    const dartEnum = mapDartEnumFromJsonSchema(customName, schema.enum);
+    ctx.enums.set(dartEnum.name, dartEnum);
+    result = dartEnum;
+  } else if ("$ref" in schema && schema.$ref) {
+    result = { name: extractNameFromRef(schema.$ref) };
+  } else if (!("type" in schema) || !schema.type) {
     const isAnyOf =
       "anyOf" in schema && schema.anyOf
         ? mapJsonSchemaListType(ctx, schema.anyOf)
@@ -222,12 +229,6 @@ const mapJsonSchemaType = (
       } else {
         result = isAllOf;
       }
-    } else if ("enum" in schema && schema.enum) {
-      const dartEnum = mapDartEnumFromJsonSchema(customName, schema.enum);
-      ctx.enums.set(dartEnum.name, dartEnum);
-      result = dartEnum;
-    } else if ("$ref" in schema && schema.$ref) {
-      result = { name: extractNameFromRef(schema.$ref) };
     }
   } else if (Array.isArray(schema.type)) {
     if (schema.type.length === 2 && schema.type.includes("null")) {
@@ -325,6 +326,17 @@ const mapJsonSchemaType = (
       }
     }
     return result;
+  }
+  if (opts?.initial) {
+    // If its the root schema, return the type in "definitions" given by the file name
+    const fileName = recase(ctx.path[0], "PascalCase");
+    const value =
+      ctx.classes.get(fileName) ??
+      ctx.enums.get(fileName) ??
+      ctx.primitiveRefs.get(fileName);
+    if (value) {
+      return typeof value === "string" ? { name: value } : value;
+    }
   }
   throw new Error(`Can't process JSON schema ${JSON.stringify(schema)}`);
 };

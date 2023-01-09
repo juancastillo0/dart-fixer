@@ -1,4 +1,4 @@
-// generated-dart-fixer-json{"from":"./m1.json","kind":"typeDefinition","md5Hash":"RUrTU2Bb3DNPXjdnG2b6HQ=="}
+// generated-dart-fixer-json{"from":"./m1.json","kind":"typeDefinition","md5Hash":"0B0CYiL9GZ65jwOUCrluuw=="}
 
 class UnionOne extends Union {
   final String id;
