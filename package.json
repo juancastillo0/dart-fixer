@@ -119,6 +119,7 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
+    "@microsoft/tsdoc": "^0.14.2",
     "@types/glob": "^8.0.0",
     "@types/markdown-it": "^12.2.3",
     "@types/minimatch": "^5.1.2",

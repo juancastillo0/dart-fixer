@@ -127,3 +127,12 @@ export const parseYamlOrJson = (doc: {
   }
   return data;
 };
+
+export const getOrSetMap = <K, V>(map: Map<K, V>, key: K, func: () => V): V => {
+  if (map.has(key)) {
+    return map.get(key) as V;
+  }
+  const value = func();
+  map.set(key, value);
+  return value;
+};
