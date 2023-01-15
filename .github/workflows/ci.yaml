@@ -23,6 +23,8 @@ jobs:
         if: always() && steps.install.outcome == 'success'
       - run: npm run eslint
         if: always() && steps.install.outcome == 'success'
+      - run: npm run check-types
+        if: always() && steps.install.outcome == 'success'
       - id: compileTests
         run: npm run compile-tests
         if: always() && steps.install.outcome == 'success'

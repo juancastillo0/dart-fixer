@@ -106,7 +106,7 @@
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
-    "lint": "npm run eslint && npm run prettier-check",
+    "lint": "npm run eslint && npm run prettier-check && npm run check-types",
     "eslint": "eslint src",
     "test": "node ./out/test/runTest.js",
     "test-unit": "npm run compile-tests && npm run mocha",
@@ -115,7 +115,8 @@
     "mocha-coverage": "nyc --reporter=lcov --reporter=text npm run mocha",
     "mocha-coverage-ts": "nyc --reporter=lcov --reporter=text npm run mocha-ts",
     "prettier": "prettier -w src",
-    "prettier-check": "prettier --check src"
+    "prettier-check": "prettier --check src",
+    "check-types": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/glob": "^8.0.0",
