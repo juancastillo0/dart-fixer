@@ -16,14 +16,20 @@ export interface DocDescription {
   examples: Array<string> | undefined;
   description: string;
   property: string;
-  classDef: string;
+  classDef: string | undefined;
+  parentClassDef: string | undefined;
+  properties: Map<string, DocDescription>;
 }
+
+export type RootDocDescription =
+  | DocDescription
+  | {
+      properties: Map<string, DocDescription>;
+    };
 
 const tsCommentsRegExp = /\/\*[\s\S]*?\*\/|(?=[^\\:]|^)\/\/.*/g;
 
-export const getTsDoc = (
-  file: string
-): Map<string, Map<string, DocDescription>> => {
+export const getTsDoc = (file: string): Map<string, RootDocDescription> => {
   const fileContent: string = fs
     .readFileSync(file, { encoding: "utf8" })
     .replace(/\* @default (?<value>[^\n]*) \*/g, "* @defaultValue $1 *");
@@ -35,7 +41,7 @@ export const getTsDoc = (
 
   // NOTE: Optionally, can provide a TSDocConfiguration here
   const tsDocParser: TSDocParser = new TSDocParser();
-  const items = new Map<string, Map<string, DocDescription>>();
+  const items = new Map<string, RootDocDescription>();
 
   commentMatches.forEach((m) => {
     const values = parseComment(tsDocParser, m, file, processedText);
@@ -44,12 +50,22 @@ export const getTsDoc = (
     }
     console.log(values);
 
-    const props = getOrSetMap(
-      items,
-      values.classDef,
-      () => new Map<string, DocDescription>()
-    );
-    props.set(values.property, values);
+    if (!values.classDef) {
+      if (items.has(values.property)) {
+        throw new Error("Duplicate");
+      }
+      items.set(values.property, values);
+    } else {
+      const props = getOrSetMap(items, values.classDef, () => ({
+        properties: new Map<string, DocDescription>(),
+      }));
+      props.properties.set(values.property, values);
+      if (values.parentClassDef) {
+        const nestedProps = items.get(values.parentClassDef)!;
+        const nestedProp = nestedProps.properties.get(values.classDef)!;
+        nestedProp.properties.set(values.property, values);
+      }
+    }
   });
   return items;
 };
@@ -116,32 +132,11 @@ const parseComment = (
   const examples = extractTags(docComment.customBlocks, "@example");
   const description = renderNode(docComment.summarySection);
 
-  const bracket = processedText.brackets.findBracket(m.index!);
-  if (!bracket) {
-    return undefined;
-  }
-  // let lineIndex =
-  //   processedText.newLines.findIndex(
-  //     (l) => l > bracket.originalStart.index
-  //   ) - 1;
-  // lineIndex =
-  //   lineIndex === -2 ? processedText.newLines.length - 1 : lineIndex;
-  const newLines = processedText.newLines;
-  const classDefLine = processedText.cleanText.substring(
-    newLines[bracket.originalStart.line],
-    newLines[bracket.originalStart.line + 1]
-  );
   const classDefRegExp =
     /\s*(class|interface|enum|type\s+=)\s+(?<name>[a-zA-Z0-9_]+)\s*(<.*>)?\s*{/g;
   const propertyDefRegExp = /^\s*(?<name>[a-zA-Z0-9_]+)\s*\??\s*:/g;
 
-  let classDef = [...classDefLine.matchAll(classDefRegExp)][0]?.groups?.[
-    "name"
-  ];
-  classDef ??= [...classDefLine.matchAll(propertyDefRegExp)][0]?.groups?.[
-    "name"
-  ];
-
+  const newLines = processedText.newLines;
   const endPosition = processedText.mapIndex(m.index! + m[0].length);
   const propertyLine = processedText.cleanText.substring(
     newLines[endPosition.line],
@@ -151,9 +146,47 @@ const parseComment = (
     "name"
   ];
   property ??= [...propertyLine.matchAll(classDefRegExp)][0]?.groups?.["name"];
-
-  if (!classDef || !property) {
+  if (!property) {
     return;
+  }
+
+  let classDef: string | undefined;
+  let classDefProp: string | undefined;
+  const bracket = processedText.brackets.findBracket(m.index!);
+  if (bracket) {
+    // let lineIndex =
+    //   processedText.newLines.findIndex(
+    //     (l) => l > bracket.originalStart.index
+    //   ) - 1;
+    // lineIndex =
+    //   lineIndex === -2 ? processedText.newLines.length - 1 : lineIndex;
+
+    const classDefLine = processedText.cleanText.substring(
+      newLines[bracket.originalStart.line],
+      newLines[bracket.originalStart.line + 1]
+    );
+
+    classDef = [...classDefLine.matchAll(classDefRegExp)][0]?.groups?.["name"];
+    const classDefPropMatch = classDef
+      ? undefined
+      : [...classDefLine.matchAll(propertyDefRegExp)][0];
+    if (!classDef && classDefPropMatch) {
+      classDefProp = classDefPropMatch.groups!["name"];
+      const parentBracket = processedText.brackets.findBracket(
+        newLines[bracket.originalStart.line] + classDefPropMatch.index!
+      );
+      if (parentBracket) {
+        const parentClassLine = processedText.cleanText.substring(
+          newLines[parentBracket.originalStart.line],
+          newLines[parentBracket.originalStart.line + 1]
+        );
+        classDef = [...parentClassLine.matchAll(classDefRegExp)][0]?.groups?.[
+          "name"
+        ];
+      } else {
+        throw new Error(`${classDefProp}`);
+      }
+    }
   }
 
   const values = {
@@ -161,8 +194,9 @@ const parseComment = (
     examples: examples.length > 0 ? examples : undefined,
     description: description.trim(),
     property,
-    classDef,
+    classDef: classDefProp ?? classDef,
+    parentClassDef: classDefProp ? classDef : undefined,
+    properties: new Map(),
   };
   return values;
 };
-

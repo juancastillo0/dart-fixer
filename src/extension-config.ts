@@ -26,6 +26,21 @@ export interface ExtensionConfig {
   errorAnalysisBehavior?: ErrorAnalysisBehavior;
 }
 
+/** A configuration to map a collection of models in `inputPath` with `inputExtension` of type `inputKind` 
+ * to `outputPath` with `outputExtension` to files of type `outputKind` following the `generatorConfig`.
+ * @example
+ * ```json
+ * {
+ *  "generatorConfig":"dataModel",
+ *  "inputPath":"lib/src/models_yaml/",
+ *  "inputKind":"schema",
+ *  "inputExtension":".schema.yaml",
+ *  "outputPath":"lib/src/models_dart/",
+ *  "outputExtension":".model.dart",
+ *  "omitTypeNamesRegExp":"Builder$"
+ * }
+ * ```
+ */
 export interface ModelMappingConfig {
   /** The configuration used to generate code for Dart classes */
   generatorConfig?: string;

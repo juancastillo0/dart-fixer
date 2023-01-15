@@ -14,13 +14,26 @@ This extension provides various utilities for working with Dart models, [JSON sc
 - [Table of Contents](#table-of-contents)
 - [Example Workspace](#example-workspace)
 - [Features](#features)
+  - [ExtensionConfig](#extensionconfig)
   - [Dart models, JSON Schema and JSON Type Definition](#dart-models-json-schema-and-json-type-definition)
     - [Model mappings](#model-mappings)
+      - [ModelMappingConfig](#modelmappingconfig)
+        - [Examples](#examples)
     - [JSON Schema vs JSON Type Definition](#json-schema-vs-json-type-definition)
   - [Documentation and example snippet synchronization](#documentation-and-example-snippet-synchronization)
     - [Markdown and Dart documentation comments](#markdown-and-dart-documentation-comments)
     - [Dart code](#dart-code)
   - [Dart model utilities generation](#dart-model-utilities-generation)
+    - [GenerationOptions](#generationoptions)
+      - [GenerationOptions.toJson](#generationoptionstojson)
+      - [GenerationOptions.fromJson](#generationoptionsfromjson)
+      - [GenerationOptions.equality](#generationoptionsequality)
+      - [GenerationOptions.copyWith](#generationoptionscopywith)
+      - [GenerationOptions.toStringOverride](#generationoptionstostringoverride)
+      - [GenerationOptions.allFieldsGetter](#generationoptionsallfieldsgetter)
+      - [GenerationOptions.allFieldsEnum](#generationoptionsallfieldsenum)
+      - [GenerationOptions.builder](#generationoptionsbuilder)
+      - [GenerationOptions.observable](#generationoptionsobservable)
     - [fromJson factory](#fromjson-factory)
     - [toJson method](#tojson-method)
     - [equality operator and hashCode getter](#equality-operator-and-hashcode-getter)
@@ -58,6 +71,16 @@ For example if there is an image subfolder under your extension project workspac
 
 > Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
 
+
+## ExtensionConfig
+
+| Name                  | Type                                                  | Required | Description                                                                                                                                                                             | Default |
+| --------------------- | ----------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| generatorConfig       | string                                                | false    | The default configuration used to generate code for Dart classes                                                                                                                        |         |
+| generator             | Map<string,[GenerationOptions](#generationoptions)>   | false    | A map of configurations used to generate code for Dart classes. The keys can be used as the `generatorConfig` value or as configuration for mappings in `mappings[key].generatorConfig` |         |
+| mappings              | Map<string,[ModelMappingConfig](#modelmappingconfig)> | false    | Configures model mappings, each configuration will execute a code generation task. The input will be mapped to generate the model representation in JSON or Dart                        |         |
+| errorAnalysisBehavior | "lint" \| "fix" \| "lintOpened"                       | false    | Task to perform linting or error fixes automatically                                                                                                                                    | "lint"  |
+
 ## Dart models, JSON Schema and JSON Type Definition
 
 - Generates Dart classes from [JSON Schema](https://json-schema.org/) or [JSON Type Definition](https://jsontypedef.com/) files.
@@ -68,6 +91,32 @@ You may generate Dart classes or JSON schemas by using [commands](#commands) or 
 ### Model mappings
 
 A model mapping configuration specifies the input and output paths and the type of files (JSON schemas, Dart classes) that the code generation should parse and generate.
+
+#### ModelMappingConfig
+A configuration to map a collection of models in `inputPath` with `inputExtension` of type `inputKind`
+to `outputPath` with `outputExtension` to files of type `outputKind` following the `generatorConfig`.
+##### Examples
+```json
+{
+ "generatorConfig":"dataModel",
+ "inputPath":"lib/src/models_yaml/",
+ "inputKind":"schema",
+ "inputExtension":".schema.yaml",
+ "outputPath":"lib/src/models_dart/",
+ "outputExtension":".model.dart",
+ "omitTypeNamesRegExp":"Builder$"
+}
+```
+| Name                | Type                                                 | Required | Description                                                                                                                                                                                                                                                                                                                                     | Default            | Example                                                 |
+| ------------------- | ---------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------- |
+| inputKind           | "document" \| "schema" \| "typeDefinition" \| "dart" | true     | The input kind. When choosing a json input kind, the json files within `inputPath` and following `inputExtension` will be mapped to the outputKind. If the input kind is "dart", the Dart files will be mapped.                                                                                                                                 |                    |                                                         |
+| inputPath           | string                                               | true     | The path for the input file(s). If its a file, only the single input file will be mapped to a single output file. If its a directory, `inputExtension` will be used to filter the input files.                                                                                                                                                  |                    |                                                         |
+| outputPath          | string                                               | true     | The path for the output file(s). If its a file, the input files will be mapped to the `outputPath`. If its a directory, `outputExtension` will added as suffix to the output file names mapped from the files in `inputPath`.                                                                                                                   |                    |                                                         |
+| generatorConfig     | string                                               | false    | The configuration used to generate code for Dart classes                                                                                                                                                                                                                                                                                        |                    |                                                         |
+| outputKind          | "schema" \| "typeDefinition"                         | false    | The output kind. When `inputKind` is a `JsonFileKind`, the output will be Dart.                                                                                                                                                                                                                                                                 | "schema"           |                                                         |
+| inputExtension      | string                                               | false    | The suffix the file names should have to be considered an input. The default is ".dart" when `inputKind` is "dart" and ".json" otherwise. Only supported language types are dart, json, json5 and yaml.                                                                                                                                         | ".json" \| ".dart" | <ul><li>".yaml"</li></ul>                               |
+| outputExtension     | string                                               | false    | The suffix the file names will have when mapped from `inputPath` to `outputPath`. Only applies when `outputPath` is a directory, otherwise `outputExtension` will be ignored. The default is ".dart" when `inputKind` is a `JsonFileKind` and ".json" when `inputKind` is "dart". Only supported language types are dart, json, json5 and yaml. | ".json" \| ".dart" | <ul><li>".schema.json5"</li><li>"_model.dart"</li></ul> |
+| omitTypeNamesRegExp | string                                               | false    | A regular expression that filters the names of input types. If the RegExp matches a Dart type or a json schema or type definition name, that type will not be in the mapped output.                                                                                                                                                             |                    |                                                         |
 
 ### JSON Schema vs JSON Type Definition
 
@@ -146,6 +195,70 @@ The generated sections will be wrapped around comments:
 ```
 
 The `md5Hash` provides a way to identify whether the generated code is out-of-date. At the moment, if you change the generated code, the extension will not show an error, since the hash of the generated code has not changed. The extension will show an error only when the new generated code has a different hash than the one in the comment.
+
+### GenerationOptions
+| Name             | Type                                                                     | Required | Description                                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| toJson           | [GenerationOptions.toJson](#generationoptionstojson)                     | false    | Generates a `Map<String, Object?> toJson()` method that returns a dart `Map<String, Object?>` with json values.                                                                                                                                                                       |
+| fromJson         | [GenerationOptions.fromJson](#generationoptionsfromjson)                 | false    | Generates a `Model.fromJson(Map json)` factory inside the class.                                                                                                                                                                                                                      |
+| equality         | [GenerationOptions.equality](#generationoptionsequality)                 | false    | Generates a `bool operator ==(Object other)` and `int get hashCode` overrides for dart equality checks.                                                                                                                                                                               |
+| copyWith         | [GenerationOptions.copyWith](#generationoptionscopywith)                 | false    | Generates a `Model copyWith(...fields)` method                                                                                                                                                                                                                                        |
+| toStringOverride | [GenerationOptions.toStringOverride](#generationoptionstostringoverride) | false    | Generates a `String toString()` method override that returns a String with all the field values.                                                                                                                                                                                      |
+| allFieldsGetter  | [GenerationOptions.allFieldsGetter](#generationoptionsallfieldsgetter)   | false    | Generates a `List<Object?> get props` getter that returns the values for all fields.                                                                                                                                                                                                  |
+| allFieldsEnum    | [GenerationOptions.allFieldsEnum](#generationoptionsallfieldsenum)       | false    | Generates a `enum ModelField` with all the fields in the class. The enum contains multiple fields and methods that have information about the field and its type.                                                                                                                     |
+| builder          | [GenerationOptions.builder](#generationoptionsbuilder)                   | false    | Generates a `class ModelBuilder` with utilities for editing and setting fields and creating new instances of the Model from the values. Can be used to create instances of `Model`. It's an alternative to the `copyWith` method.                                                     |
+| observable       | [GenerationOptions.observable](#generationoptionsobservable)             | false    | Generates a `class ModelObservable` with utilities for subscribing to changes in a mutable model creating new instances of the Model from the values. Can be used to create instances of `Model`. Can be used with the mobx library's `Observable` or with Flutter's `ValueNotifier`. |
+#### GenerationOptions.toJson
+| Name     | Type    | Required | Description                                             |
+| -------- | ------- | -------- | ------------------------------------------------------- |
+| nested   | boolean | false    | Whether call the `toJson` method for nested values.     |
+| metadata | string  | false    | You may put Dart comments or annotations for the method |
+#### GenerationOptions.fromJson
+| Name            | Type                                                      | Required | Description                                              | Default    |
+| --------------- | --------------------------------------------------------- | -------- | -------------------------------------------------------- | ---------- |
+| constructorName | string                                                    | false    | The name of the constructor factory.                     | "fromJson" |
+| metadata        | string                                                    | false    | You may put Dart comments or annotations for the factory |            |
+| parameterType   | "Object?" \| "dynamic" \| "Map" \| "Map<String, Object?>" | false    | The parameter type for the constructor.                  | "Map"      |
+#### GenerationOptions.equality
+| Name         | Type    | Required | Description                                                                                                                                                                                                                      |
+| ------------ | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| equalsMethod | string  | false    | Whether to use a custom equals method instead of Dart's `==` operator for the comparison of the fields. For example, if using `package:collection` you could set it to "const DeepCollectionEquality().equals" for deep equality |
+| hashMethod   | string  | false    | Whether to use a custom hash method instead of Dart's `.hashCode` getter for the hashCode of the class. For example, if using `package:collection` you could set it to "const DeepCollectionEquality().hash" for deep equality   |
+| customImport | string  | false    | A custom import for the `equalsMethod`. For example, if using `import "package:collection:collection.dart";` for deep equality                                                                                                   |
+| deep         | boolean | false    | Whether to use `package:collection`'s deep equality methods                                                                                                                                                                      |
+#### GenerationOptions.copyWith
+| Name     | Type   | Required | Description                                             |
+| -------- | ------ | -------- | ------------------------------------------------------- |
+| metadata | string | false    | You may put Dart comments or annotations for the method |
+#### GenerationOptions.toStringOverride
+| Name     | Type   | Required | Description                                             |
+| -------- | ------ | -------- | ------------------------------------------------------- |
+| metadata | string | false    | You may put Dart comments or annotations for the method |
+#### GenerationOptions.allFieldsGetter
+| Name     | Type   | Required | Description                                             | Default |
+| -------- | ------ | -------- | ------------------------------------------------------- | ------- |
+| name     | string | false    | The name of the getter.                                 | "props" |
+| metadata | string | false    | You may put Dart comments or annotations for the getter |         |
+#### GenerationOptions.allFieldsEnum
+| Name         | Type   | Required | Description                                                                                                                              | Default         |
+| ------------ | ------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| nameTemplate | string | false    | The name for the Fields enum. You may use "{{name}}" as a variable inside the template that will be replaced with the name of the model. | "{{name}}Field" |
+| metadata     | string | false    | You may put Dart comments or annotations for the enum                                                                                    |                 |
+#### GenerationOptions.builder
+| Name         | Type   | Required | Description                                                                                                                                | Default           |
+| ------------ | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- |
+| nameTemplate | string | false    | The name for the Builder class. You may use "{{name}}" as a variable inside the template that will be replaced with the name of the model. | "{{name}}Builder" |
+| metadata     | string | false    | You may put Dart comments or annotations for the class                                                                                     |                   |
+#### GenerationOptions.observable
+| Name                       | Type    | Required | Description                                                                                                                                   | Default              |
+| -------------------------- | ------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| reactivityClass            | string  | true     | The name of the reactivity class for example. For example "Observable" for mobx.                                                              |                      |
+| customImport               | string  | true     | An import needed to use the reactivity class                                                                                                  |                      |
+| nameTemplate               | string  | false    | The name for the Observable class. You may use "{{name}}" as a variable inside the template that will be replaced with the name of the model. | "{{name}}Observable" |
+| collectionsReactivityClass | boolean | false    |                                                                                                                                               |                      |
+| passThisToConstructor      | boolean | false    | Whether to pass `this`, the observable instance, to the constructor of the reactivity class                                                   | false                |
+| metadata                   | string  | false    | You may put Dart comments or annotations for the class                                                                                        |                      |
+
 
 ### fromJson factory
 

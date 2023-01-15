@@ -25,17 +25,31 @@ export enum JTDToTableSchemaKey {
 }
 
 export class JTDToTable {
-  current = "";
+  public get current(): string {
+    return this.path[this.path.length - 1];
+  }
+
+  path: Array<string> = [];
 
   constructor(public rootSchema: SomeJTDSchemaType) {}
+
+  private addPath = (schema: SomeJTDSchemaType, name: string): void => {
+    const title = schema.metadata?.["title"] as string | undefined;
+    const newPath =
+      title ?? `${this.current ? this.current + "." : ""}${name ?? ""}`;
+    if (typeof newPath !== "string" || (!title && !name)) {
+      throw new Error(
+        `Could not find path for name:${name}, schema:${JSON.stringify(schema)}`
+      );
+    }
+    this.path.push(newPath);
+  };
 
   mapJTDToTable = (
     name: string,
     schema: SomeJTDSchemaTypeObject | SomeJTDSchemaTypeUnion
   ): Array<{ name: string; table: string }> => {
-    const prev = this.current;
-    // TODO: use title metadata
-    this.current = name;
+    this.addPath(schema, name);
 
     const isUnion = "mapping" in schema;
     let options: ObjectTableOptions;
@@ -96,7 +110,7 @@ export class JTDToTable {
           )
         )
     );
-    this.current = prev;
+    this.path.pop();
     return tables;
   };
 
@@ -156,11 +170,8 @@ export class JTDToTable {
     });
   };
 
-  mapJTDToType = (schema: SomeJTDSchemaType, name?: string): string => {
-    const prev = this.current;
-    if (name) {
-      this.current = name;
-    }
+  mapJTDToType = (schema: SomeJTDSchemaType, name: string): string => {
+    this.addPath(schema, name);
     const value = mapJTD(schema, {
       ref: (s) => `${s.ref}`,
       primitive: (s) => `${s.type}`,
@@ -169,14 +180,15 @@ export class JTDToTable {
         `Array<${this.mapJTDToType(s.elements, `${this.current}Element`)}>`,
       map: (s) =>
         `Map<string,${this.mapJTDToType(s.values, `${this.current}Value`)}>`,
-      object: () => `${this.current}`,
+      object: () =>
+        `[${this.current}](#${this.current.replace(/\./g, "").toLowerCase()})`,
       union: (s) =>
         `${Object.entries(s.mapping)
           .map(([key, type]) => this.mapJTDToType(type, key))
           .join(" \\| ")}`,
       base: (_) => `any`,
     });
-    this.current = prev;
+    this.path.pop();
 
     if (schema.nullable) {
       return `${value}?`;
