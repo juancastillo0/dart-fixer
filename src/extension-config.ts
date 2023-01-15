@@ -66,6 +66,10 @@ export const modelMappingConfigValidate = compileCustomValidator(
 );
 
 const extensionConfigSchema: AjvJTDSchemaType<ExtensionConfig> = {
+  metadata: {
+    // TODO: use title for Map<string,<propName>Value> in markdown table
+    title: "ExtensionConfig"
+  },
   optionalProperties: {
     generatorConfig: { type: "string" },
     generator: { values: generationOptionsSchema },

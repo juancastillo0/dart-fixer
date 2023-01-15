@@ -47,7 +47,9 @@ export const zipMapped = <T1, T2, O>(
 };
 
 export { AjvJTDSchemaType };
-const globalAjv = new Ajv();
+const globalAjv = new Ajv({
+  keywords: ["title"]
+});
 const globalJSONSchemaAjv = new AjvJSONSchema();
 
 export interface SchemaValidator<T> {

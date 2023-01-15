@@ -106,6 +106,9 @@ export interface GenerationOptions {
 }
 
 export const generationOptionsSchema: AjvJTDSchemaType<GenerationOptions> = {
+  metadata: {
+    title: "GenerationOptions"
+  },
   optionalProperties: {
     toJson: {
       optionalProperties: {
