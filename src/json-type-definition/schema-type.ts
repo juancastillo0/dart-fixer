@@ -55,7 +55,7 @@ export type SomeJTDSchemaTypeMap = {
 } & SomeJTDSchemaTypeBase;
 export type SomeJTDSchemaTypeUnion = {
   discriminator: string;
-  mapping: Record<string, SomeJTDSchemaType>;
+  mapping: Record<string, SomeJTDSchemaTypeObject>;
 } & SomeJTDSchemaTypeBase;
 export type SomeJTDSchemaTypeObject = (
   | {

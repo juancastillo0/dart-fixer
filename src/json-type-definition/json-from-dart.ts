@@ -6,7 +6,7 @@ import {
   DartMetadata,
   DartType,
 } from "../dart-base/parser";
-import { SomeJTDSchemaType } from "./schema-type";
+import { SomeJTDSchemaType, SomeJTDSchemaTypeObject } from "./schema-type";
 
 export type JsonTypeDartSpec =
   | DartClass
@@ -50,8 +50,8 @@ export class JsonTypeDefFromDart {
         mapping: (dartType.variants instanceof Map
           ? [...dartType.variants.entries()]
           : Object.entries(dartType.variants)
-        ).reduce<Record<string, SomeJTDSchemaType>>((p, [key, value]) => {
-          p[key] = this.dartModelToJsonTypeDefinition(value);
+        ).reduce<Record<string, SomeJTDSchemaTypeObject>>((p, [key, value]) => {
+          p[key] = this.dartModelToJsonTypeDefinition(value) as SomeJTDSchemaTypeObject;
           return p;
         }, {}),
       };

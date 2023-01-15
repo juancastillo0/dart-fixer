@@ -8,7 +8,7 @@ import {
 import { JSONSchemaType, Known, Nullable } from "./schema-type";
 
 type JSONSchemaT =
-  | (JSONSchemaType<Known> | { $ref: string } | object) &
+  | (JSONSchemaType<Known> | object) &
       Partial<Nullable<unknown>> & { $schema?: string };
 
 export class JsonSchemaFromDart {
