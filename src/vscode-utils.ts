@@ -1,8 +1,13 @@
 import * as vscode from "vscode";
-import { FileSystemManager, TextDocument } from "./dart-base/file-system";
+import {
+  FileSystemManager,
+  Range,
+  TextDocument,
+} from "./dart-base/file-system";
 import { Path } from "./dart-base/dart-dependencies";
 import { EXTENSION_NAME } from "./extension";
 import {
+  DiagnosticInfo,
   GeneratedSection,
   ReplaceCodeAction,
 } from "./generator/generator-utils";
@@ -115,25 +120,43 @@ export const makeReplaceContentAction = (
   const end = document.positionAt(document.text.length);
   action.edit.replace(
     vscode.Uri.parse(document.uri),
-    new vscode.Range(0, 0, end.line, end.column),
+    args.range
+      ? mapRange(args.range)
+      : new vscode.Range(0, 0, end.line, end.column),
     args.text
   );
   if (args.diagnostic) {
-    const range = args.diagnostic.range;
-    action.diagnostics = [
-      new vscode.Diagnostic(
-        range
-          ? new vscode.Range(
-              range.start.line,
-              range.start.column,
-              range.end.line,
-              range.end.column
-            )
-          : new vscode.Range(0, 0, 1, 0),
-        args.diagnostic.message,
-        vscode.DiagnosticSeverity.Error
-      ),
-    ];
+    const diagnostic = mapDiagnostics(args.diagnostic);
+    action.diagnostics = [diagnostic];
   }
   return action;
 };
+
+export const mapDiagnostics = (args: DiagnosticInfo): vscode.Diagnostic => {
+  const range = args.range;
+  const diagnostic = new vscode.Diagnostic(
+    range ? mapRange(range) : new vscode.Range(0, 0, 1, 0),
+    args.message,
+    vscode.DiagnosticSeverity.Error
+  );
+  if (args.code) {
+    diagnostic.code = args.code;
+  }
+  return diagnostic;
+};
+
+export const mapRange = (range: Range): vscode.Range =>
+  new vscode.Range(
+    range.start.line,
+    range.start.column,
+    range.end.line,
+    range.end.column
+  );
+
+export const mapVsCodeRange = (range: vscode.Range): Range => ({
+  start: {
+    column: range.start.character,
+    line: range.start.line,
+  },
+  end: { column: range.end.character, line: range.end.line },
+});

@@ -237,8 +237,13 @@ export interface ReplaceCodeAction {
   document: TextDocument;
   text: string;
   name: string;
-  diagnostic?: {
-    message: string;
-    range?: Range;
-  };
+  range?: Range;
+  diagnostic?: DiagnosticInfo;
+}
+
+export interface DiagnosticInfo {
+  document: TextDocument;
+  message: string;
+  range?: Range;
+  code?: string
 }

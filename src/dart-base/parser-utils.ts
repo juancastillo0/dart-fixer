@@ -119,10 +119,25 @@ export interface MatchPosition {
   text: string;
 }
 
-export interface TextPosition {
-  index: number;
+export class TextPosition {
+  constructor(data: TextPosition) {
+    this.line = data.line;
+    this.column = data.column;
+    this.index = data.index;
+  }
+
   line: number;
   column: number;
+  index?: number;
+
+  static lt = (p1: TextPosition, p2: TextPosition): boolean =>
+    p1.line < p2.line || (p1.line === p2.line && p1.column < p2.column);
+  static lte = (p1: TextPosition, p2: TextPosition): boolean =>
+    p1.line < p2.line || (p1.line === p2.line && p1.column <= p2.column);
+  static gt = (p1: TextPosition, p2: TextPosition): boolean =>
+    p1.line > p2.line || (p1.line === p2.line && p1.column > p2.column);
+  static gte = (p1: TextPosition, p2: TextPosition): boolean =>
+    p1.line > p2.line || (p1.line === p2.line && p1.column >= p2.column);
 }
 
 export interface CleanedText {

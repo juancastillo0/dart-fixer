@@ -3,9 +3,15 @@ import * as fs from "fs/promises";
 import minimatch = require("minimatch");
 import { CleanedText, cleanRawText, TextPosition } from "./parser-utils";
 
-export interface Range {
-  start: TextPosition;
-  end: TextPosition;
+export class Range {
+  constructor(public start: TextPosition, public end: TextPosition) {}
+
+  static contains = (range: Range, position: TextPosition | Range): boolean =>
+    "start" in position
+      ? Range.contains(range, position.start) &&
+        Range.contains(range, position.end)
+      : TextPosition.lte(range.start, position) &&
+        TextPosition.gte(range.end, position);
 }
 
 export class TextDocument {
@@ -22,6 +28,12 @@ export class TextDocument {
     this.cleanedText = cleanRawText(this.text, []);
     this.fileExtension = getFileType(this.uri);
   }
+
+  getText = (range: Range): string =>
+    this.text.substring(
+      this.cleanedText.newLines[range.start.line] + range.start.column,
+      this.cleanedText.newLines[range.end.line] + range.end.column
+    );
 
   public get filename(): string {
     return this.uri.substring(this.uri.lastIndexOf("/") + 1);
@@ -116,6 +128,7 @@ export interface FileExtensionInfo {
   kind: FileKind;
   extension: FileExtension;
   schemaKind: SchemaKind | undefined;
+  extensionStr: string;
 }
 
 export const getFileType = (filename: string): FileExtensionInfo => {
@@ -143,5 +156,5 @@ export const getFileType = (filename: string): FileExtensionInfo => {
     }
   }
 
-  return { extension, kind, schemaKind };
+  return { extensionStr, extension, kind, schemaKind };
 };
