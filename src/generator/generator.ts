@@ -178,6 +178,8 @@ ${isMap ? "" : "  final json = _json as Map;\n"}\
       return `${nullableCast}Duration(microseconds: ${getter} as int)`;
     } else if (dartType.isBigInt) {
       return `${nullableCast}BigInt.parse(${getter} as String)`;
+    } else if (dartType.isUri) {
+      return `${nullableCast}Uri.parse(${getter} as String)`;
     } else if (dartType.isPrimitive || dartType.text === "Object") {
       return `${getter} as ${dartType.text}`;
     }
@@ -270,6 +272,8 @@ Map<String, Object${question}> toJson() {
     } else if (dartType.isDuration) {
       return `${getter}.inMicroseconds`;
     } else if (dartType.isBigInt) {
+      return `${getter}.toString()`;
+    } else if (dartType.isUri) {
       return `${getter}.toString()`;
     }
     if (this.options.toJson?.nested) {

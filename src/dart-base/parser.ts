@@ -823,6 +823,9 @@ export class DartType {
   get isBigInt(): boolean {
     return this.name === "BigInt" && this.isNotGeneric;
   }
+  get isUri(): boolean {
+    return this.name === "Uri" && this.isNotGeneric;
+  }
 
   get isInt(): boolean {
     return this.name === "int" && this.isNotGeneric;
