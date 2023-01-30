@@ -8,6 +8,7 @@ import {
   JsonFileKind,
 } from "../generator/generator-utils";
 import { removeMatch } from "./parser.test";
+import { getDefaultGeneratorConfig } from "../extension-config";
 
 suite("type model schemas JSON", () => {
   const packageName = "test_workspace";
@@ -23,6 +24,7 @@ suite("type model schemas JSON", () => {
     const schemaFileText = fs.readFileSync(params.schemaPath, {
       encoding: "utf-8",
     });
+    const config = getDefaultGeneratorConfig(analyzer?.globalConfig);
     const value = await createDartModelFromJSON(
       {
         text: schemaFileText,
@@ -30,7 +32,8 @@ suite("type model schemas JSON", () => {
         jsonFile: params.schemaPath,
       },
       params.jsonKind,
-      analyzer
+      analyzer,
+      config ? { config, name: undefined } : undefined
     );
 
     const parsed = parseClassesAntlr(value.text, {

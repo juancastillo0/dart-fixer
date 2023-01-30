@@ -14,13 +14,29 @@ dev_dependencies:
   test: ^1.16.0
 
 dart_fixer:
+  generator:
+    noBuilder:
+      fromJson: {}
+      toJson: {}
+      equality: {}
+      copyWith: {}
+      toStringOverride: {}
+      allFieldsGetter: {}
+      allFieldsEnum: {}
   mappings:
     models:
-      jsonDir: lib/models/output/
-      dartDir: lib/models/input/
+      outputPath: lib/models/output/
+      inputPath: lib/models/input/
       inputKind: dart
       outputKind: schema
     typedefs:
-      jsonDir: lib/models/typedefs
-      dartDir: lib/models/typedefs/
+      inputPath: lib/models/typedefs
+      outputPath: lib/models/typedefs/
       inputKind: typeDefinition
+      
+    single:
+      generatorConfig: noBuilder
+      inputPath: lib/models/single
+      outputPath: lib/models/single/output.gen.dart
+      inputKind: schema
+      inputExtension: schema.yaml

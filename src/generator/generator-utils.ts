@@ -15,6 +15,7 @@ import {
   jsonTypeDefinitionValidator,
   parseYamlOrJson,
 } from "../utils";
+import { GenerationOptions } from "./generator-config";
 
 export interface GeneratedSection {
   md5Hash: string;
@@ -76,11 +77,12 @@ export enum JsonFileKind {
 export const createDartModelFromJSON = async (
   document: JsonEditParams,
   kind: JsonFileKind,
-  analyzer: DartAnalyzer | undefined
+  analyzer: DartAnalyzer | undefined,
+  generatorConfig: NamedGeneratorConfig | undefined
 ): Promise<{ text: string; md5Hash: string }> => {
   const text = document.text;
   const newFile = document.newFile;
-  const { identifierName } = nameFromFile(newFile);
+  const { identifierName } = nameFromFile(document.jsonFile);
   const path = [identifierName];
 
   const documentInfo = {
@@ -121,6 +123,7 @@ export const createDartModelFromJSON = async (
     analyzer,
     newFile,
     kind,
+    generatorConfig,
   };
 
   let dartFileText = generateDartFileFromJsonData(params);
@@ -163,19 +166,25 @@ export const pathRelativeTo = (params: {
   return fileName;
 };
 
+export interface NamedGeneratorConfig {
+  config: GenerationOptions;
+  name: string | undefined;
+}
+
 const generateDartFileFromJsonData = (params: {
   ctx: JsonSchemaCtx;
   fileName: string;
   analyzer: DartAnalyzer | undefined;
   newFile: string;
   kind: JsonFileKind;
+  generatorConfig: NamedGeneratorConfig | undefined;
 }): { text: string; md5Hash: string } => {
   const ctx = params.ctx;
   const printer = new DartModelPrinter();
   const classes = [...ctx.classes.values()];
   const generator = new ClassGenerator(
     // TODO: generator options
-    {},
+    params.generatorConfig?.config ?? {},
     params.analyzer && {
       analyzer: params.analyzer,
       outputFile: params.newFile,
@@ -207,6 +216,7 @@ ${[...ctx.primitiveRefs.entries()]
     from: params.fileName,
     kind: params.kind,
     md5Hash,
+    generatorConfig: params.generatorConfig?.name,
   };
   const text = `// generated-dart-fixer-json${JSON.stringify(
     commentData
@@ -221,6 +231,7 @@ interface CommentDartFromJson {
   from: string;
   md5Hash: string;
   kind: JsonFileKind;
+  generatorConfig: string | undefined;
 }
 
 export const getCommentGeneratedDartFromJson = (
@@ -245,5 +256,5 @@ export interface DiagnosticInfo {
   document: TextDocument;
   message: string;
   range?: Range;
-  code?: string
+  code?: string;
 }

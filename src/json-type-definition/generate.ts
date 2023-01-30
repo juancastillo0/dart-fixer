@@ -3,22 +3,34 @@ import { DartAnalyzer } from "../dart-base/analyzer";
 import {
   createDartModelFromJSON,
   JsonFileKind,
+  NamedGeneratorConfig,
 } from "../generator/generator-utils";
 import { JsonSchemaFromDart } from "../json-schema/json-from-dart";
 import { DartDefKind, DartParsedFile } from "../dart-base/parser";
 import { JsonTypeDartSpec, JsonTypeDefFromDart } from "./json-from-dart";
+
+export type JsonGenerateOutput =
+  | {
+      text: string;
+      md5Hash: string;
+    }
+  | {
+      json: AnyJsonSchema;
+      md5Hash: string;
+    };
 
 export const generateOutput = async (
   params: {
     file: string;
     outputFile: string;
     inputKind: JsonFileKind | "dart";
-    outputKind: JsonFileKind.schema | JsonFileKind.typeDefinition | undefined;
+    outputKind: JsonFileKind.schema | JsonFileKind.typeDefinition;
+    generatorConfig: NamedGeneratorConfig | undefined;
   },
   analyzer: DartAnalyzer
-): Promise<string | undefined> => {
+): Promise<JsonGenerateOutput | undefined> => {
   const document = await analyzer.fsControl.openTextDocument(params.file);
-  let text: string;
+  let output: JsonGenerateOutput;
   if (params.inputKind !== "dart") {
     const dartFileText = await createDartModelFromJSON(
       {
@@ -27,38 +39,65 @@ export const generateOutput = async (
         jsonFile: document.uri,
       },
       params.inputKind,
-      analyzer
+      analyzer,
+      params.generatorConfig
     );
-    text = dartFileText.text;
+    output = dartFileText;
   } else {
     const result = await analyzer.getData(document);
     if (result.error) {
       console.error(result.error);
       return undefined;
     }
-    const outputKind = params.outputKind ?? JsonFileKind.schema;
     const jsonModel = dartModelsToJsonType(
       result.data.values,
-      outputKind,
+      params.outputKind,
       params.file
     );
-    text = JSON.stringify(jsonModel.json);
+    output = jsonModel;
   }
-  console.info("generateOutput", params, text);
-  return text;
+  console.info("generateOutput", params, output);
+  return output;
 };
 
-export interface JsonDartFixerMetadata {
+export type JsonDartFixerMetadata =
+  | JsonDartFixerMetadataSingle
+  | JsonDartFixerMetadataMany;
+
+export interface JsonDartFixerMetadataSingle {
   sourceDartFile: string;
   md5Hash: string;
   outputKind: JsonFileKind.schema | JsonFileKind.typeDefinition;
+}
+
+export interface JsonDartFixerMetadataMany {
+  files: Array<{ file: string; md5Hash: string }>;
+  outputKind: JsonFileKind.schema | JsonFileKind.typeDefinition;
+}
+
+export interface AnyJsonSchemaMany {
+  [k: string]: unknown;
+  definitions: Record<string, Record<string, unknown>>;
+  metadata: {
+    [k: string]: unknown;
+    dartFixer: JsonDartFixerMetadataMany;
+  };
+}
+
+export interface AnyJsonSchema {
+  [k: string]: unknown;
+  definitions: Record<string, Record<string, unknown>>;
+  metadata: {
+    [k: string]: unknown;
+    dartFixer: JsonDartFixerMetadataSingle;
+  };
 }
 
 export const dartModelsToJsonType = (
   values: DartParsedFile,
   outputKind: JsonFileKind.schema | JsonFileKind.typeDefinition,
   sourceFile: string
-): { json: Record<string, unknown>; md5Hash: string } => {
+): { json: AnyJsonSchema; md5Hash: string } => {
   const allTypes = new Map<string, JsonTypeDartSpec>();
   for (const [, def] of values.typeDefinitions()) {
     if (def.kind === DartDefKind.mixin) {
@@ -69,16 +108,16 @@ export const dartModelsToJsonType = (
       allTypes.set(def.name, def);
     }
   }
-  let value: Record<string, unknown>;
+  let value: AnyJsonSchema;
   switch (outputKind) {
     case JsonFileKind.schema: {
       const schema = new JsonSchemaFromDart(allTypes);
-      value = schema.generateAll() as Record<string, unknown>;
+      value = schema.generateAll() as AnyJsonSchema;
       break;
     }
     case JsonFileKind.typeDefinition: {
       const schema = new JsonTypeDefFromDart(allTypes);
-      value = schema.generateAll() as Record<string, unknown>;
+      value = schema.generateAll() as AnyJsonSchema;
       break;
     }
   }
@@ -86,11 +125,14 @@ export const dartModelsToJsonType = (
   const md5Hash = createHash("md5")
     .update(JSON.stringify(value))
     .digest("base64");
-  const metadata = (value["metadata"] ??= {}) as Record<string, unknown>;
-  metadata["dartFixer"] = {
+  const metadata = (value.metadata ??= {} as {
+    [k: string]: unknown;
+    dartFixer: JsonDartFixerMetadataSingle;
+  });
+  metadata.dartFixer = {
     sourceDartFile: sourceFile,
     md5Hash,
     outputKind,
-  } as JsonDartFixerMetadata;
+  };
   return { json: value, md5Hash };
 };

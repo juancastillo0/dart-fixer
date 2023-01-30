@@ -6,7 +6,10 @@ import {
   COMMAND_GENERATE_JSON_SCHEMA,
   COMMAND_GENERATE_JSON_TYPE_DEFINITION,
 } from "../extension";
-import { ExtensionConfig } from "../extension-config";
+import {
+  ExtensionConfig,
+  getDefaultGeneratorConfig,
+} from "../extension-config";
 import {
   createDartModelFromJSON,
   JsonEditParams,
@@ -123,6 +126,7 @@ export class JsonTypeDefinitionDartCodeActionProvider
 
     const edits = await getModelMappings(
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
+      c,
       c.mappings,
       this.analyzer
     );
@@ -164,6 +168,7 @@ export const executeJsonToDartCommand = async (
     const document = activeEditor.document;
     const name = nameFromFile(pathFromUri(document.uri)).identifierName;
     const newUri = vscode.Uri.joinPath(document.uri, "..", `${name}.dart`);
+    const config = getDefaultGeneratorConfig(options?.analyzer?.globalConfig);
     const dartFileText = await createDartModelFromJSON(
       params ?? {
         newFile: pathFromUri(newUri),
@@ -171,7 +176,8 @@ export const executeJsonToDartCommand = async (
         jsonFile: pathFromUri(document.uri),
       },
       jsonKind,
-      options?.analyzer
+      options?.analyzer,
+      config ? { config, name: undefined } : undefined
     );
 
     const edit = new vscode.WorkspaceEdit();
