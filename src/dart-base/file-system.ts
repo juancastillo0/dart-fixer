@@ -31,8 +31,8 @@ export class TextDocument {
 
   getText = (range: Range): string =>
     this.text.substring(
-      this.cleanedText.newLines[range.start.line] + range.start.column,
-      this.cleanedText.newLines[range.end.line] + range.end.column
+      this.cleanedText.newLines[range.start.line] + range.start.column + 1,
+      this.cleanedText.newLines[range.end.line] + range.end.column + 1
     );
 
   public get filename(): string {
