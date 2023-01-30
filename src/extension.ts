@@ -115,6 +115,12 @@ export function activate(context: vscode.ExtensionContext): void {
       CommentsCodeActions.metadata
     )
   );
+  context.subscriptions.push(
+    vscode.languages.registerDefinitionProvider(
+      CommentsCodeActions.documentSelector,
+      commentsCodeAction
+    )
+  );
 
   /// COMMANDS
   context.subscriptions.push(
