@@ -7,7 +7,7 @@ import AjvJSONSchema, { JSONSchemaType as AjvJSONSchemaType } from "ajv";
 import * as JSONTypeDefSchema_ from "./json-type-definition/json-type-definition.schema.json";
 import { camelCase, constantCase, pascalCase, snakeCase } from "change-case";
 import * as yaml from "yaml";
-import JSON5 from "json5";
+import * as JSON5 from "json5";
 import { JSONSchemaType } from "./json-schema/schema-type";
 import { JTDSchemaType } from "./json-type-definition/schema-type";
 
@@ -124,6 +124,21 @@ export const parseYamlOrJson = (doc: {
     data = yaml.parse(doc.text);
   } else {
     data = (JSON5 as { parse: (text: string) => unknown }).parse(doc.text);
+  }
+  return data;
+};
+
+export const printYamlOrJson = (doc: {
+  document: Record<string, unknown>;
+  uri: string;
+}): string => {
+  let data: string;
+  if (doc.uri.match(/\.(yaml|yml)$/)) {
+    data = yaml.stringify(doc.document);
+  } else if (doc.uri.match(/\.(json5|jsonc)$/)) {
+    data = JSON5.stringify(doc.document);
+  } else {
+    data = JSON.stringify(doc.document);
   }
   return data;
 };
