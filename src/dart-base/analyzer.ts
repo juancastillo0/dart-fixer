@@ -16,7 +16,10 @@ import {
 import { DartParsedFile, DartType, DartTypeAlias, DartTypeDef } from "./parser";
 import { GenerationOptions } from "../generator/generator-config";
 import * as path from "path";
-import { getDefaultGeneratorConfig } from "../extension-config";
+import {
+  ExtensionConfig,
+  getDefaultGeneratorConfig,
+} from "../extension-config";
 import { FileSystemManager, TextDocument } from "./file-system";
 
 export interface ParsedDartFile {
@@ -42,7 +45,7 @@ interface DocumentPromise {
 
 export class DartAnalyzer {
   constructor(
-    globalConfig: GenerationOptions | undefined,
+    globalConfig: ExtensionConfig | undefined,
     opts: { fsControl: FileSystemManager }
   ) {
     this.updateConfig(globalConfig);
@@ -50,13 +53,13 @@ export class DartAnalyzer {
   }
 
   fsControl: FileSystemManager;
-  globalConfig: GenerationOptions | undefined;
+  globalConfig: ExtensionConfig | undefined;
   pubSpecDataMap: Map<Path, PubSpecData> | undefined;
   // TODO: remove deleted files
   cache = new Map<string, ParsedDartFile>();
   private _processing = new Map<string, DocumentPromise>();
 
-  updateConfig = (globalConfig: GenerationOptions | undefined): void => {
+  updateConfig = (globalConfig: ExtensionConfig | undefined): void => {
     this.globalConfig = globalConfig;
     // TODO: update cache
   };
@@ -261,7 +264,7 @@ export class DartAnalyzer {
         // TODO: merge config
         config:
           getDefaultGeneratorConfig(pubSpecDataE?.data?.dart_fixer) ??
-          this.globalConfig,
+          getDefaultGeneratorConfig(this.globalConfig),
       };
       this.cache.set(document.uri.toString(), {
         document,

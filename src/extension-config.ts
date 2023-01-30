@@ -11,6 +11,32 @@ export enum ErrorAnalysisBehavior {
   lintOpened = "lintOpened",
 }
 
+/** The main configuration for the extension.
+ * 
+ * @example
+ * ```json
+ * {
+ *  "generatorConfig":"dataClass",
+ *  "generator":{
+ *    "dataClass":{},
+ *    "serde":{
+ *      "fromJson":{},
+ *      "toJson":{}
+ *     }
+ *   },
+ *  "mappings":{
+ *    "api":{
+ *      "inputPath":"backend/models/",
+ *      "inputKind":"typeDefinition",
+ *      "outputPath":"lib/src/api/models/",
+ *      "outputExtension":"_model.dart",
+ *      "generatorConfig":"serde"
+ *    }
+ *  },
+ *  "errorAnalysisBehavior":"fix"
+ * }
+ * ```
+ */
 export interface ExtensionConfig {
   /** The default configuration used to generate code for Dart classes */
   generatorConfig?: string;
@@ -28,6 +54,7 @@ export interface ExtensionConfig {
 
 /** A configuration to map a collection of models in `inputPath` with `inputExtension` of type `inputKind` 
  * to `outputPath` with `outputExtension` to files of type `outputKind` following the `generatorConfig`.
+ * 
  * @example
  * ```json
  * {
@@ -44,35 +71,57 @@ export interface ExtensionConfig {
 export interface ModelMappingConfig {
   /** The configuration used to generate code for Dart classes */
   generatorConfig?: string;
-  /** The path */
-  jsonDir: string; // TODO: Glob
-  /** The path */
-  dartDir: string; // TODO: Glob
-  /** The input kind. When choosing a json input kind, all `*.json` files
-   * within `jsonDir` will be mapped to the outputKind.
-   * If the input kind is "dart", all Dart files within `dartDir` will be mapped. */
+  /** The path for the input file(s). If its a file, only the single input file will be mapped
+   * to a single output file. If its a directory, `inputExtension` will be used to filter the input files. */
+  inputPath: string;
+  /** The path for the output file(s). If its a file, the input files will be mapped
+   * to the `outputPath`. If its a directory, `outputExtension` will added as suffix to the output file names
+   * mapped from the files in `inputPath`. */
+  outputPath: string;
+  /** The input kind. When choosing a json input kind, the json files
+   * within `inputPath` and following `inputExtension` will be mapped to the outputKind.
+   * If the input kind is "dart", the Dart files will be mapped. */
   inputKind: JsonFileKind | "dart";
   /** The output kind. When `inputKind` is a `JsonFileKind`, the output will be Dart.
-   * @default JsonFileKind.schema */
+   * @default "schema" */
   outputKind?: JsonFileKind.schema | JsonFileKind.typeDefinition;
-  /** Whether there should only be one output file.
-   * @default false */
-  // TODO: parse outputPath instead of jsonDir/dartDir
-  singleFileOutput?: boolean;
   // TODO: use constructor, use fields, use public fields, all required
   // TODO: generate JsonFileKind.document with faker
+
+  /** The suffix the file names should have to be considered an input.
+   * The default is ".dart" when `inputKind` is "dart" and ".json" otherwise.
+   * Only supported language types are dart, json, json5 and yaml.
+   * @example ".yaml"
+   * @default ".json" | ".dart" */
+  inputExtension?: string;
+  /** The suffix the file names will have when mapped from `inputPath` to `outputPath`.
+   * Only applies when `outputPath` is a directory, otherwise `outputExtension` will be ignored.
+   * The default is ".dart" when `inputKind` is a `JsonFileKind` and ".json" when `inputKind` is "dart".
+   * Only supported language types are dart, json, json5 and yaml.
+   * @example ".schema.json5"
+   * @example "_model.dart"
+   * @default ".json" | ".dart" */
+  outputExtension?: string;
+  /** A regular expression that filters the names of input types. If the RegExp matches a Dart type
+   * or a json schema or type definition name, that type will not be in the mapped output. */
+  omitTypeNamesRegExp?: string;
 }
 
 const modelMappingConfigSchema: AjvJTDSchemaType<ModelMappingConfig> = {
+  metadata: {
+    title: "ModelMappingConfig"
+  },
   optionalProperties: {
     generatorConfig: { type: "string" },
     outputKind: { enum: [JsonFileKind.schema, JsonFileKind.typeDefinition] },
-    singleFileOutput: { type: "boolean" },
+    inputExtension: { type: "string" },
+    outputExtension: { type: "string" },
+    omitTypeNamesRegExp: { type: "string" },
   },
   properties: {
     inputKind: { enum: [...Object.values(JsonFileKind), "dart"] },
-    jsonDir: { type: "string" },
-    dartDir: { type: "string" },
+    inputPath: { type: "string" },
+    outputPath: { type: "string" },
   },
 };
 

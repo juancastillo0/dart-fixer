@@ -79,12 +79,9 @@ export function activate(context: vscode.ExtensionContext): void {
     `Congratulations, your extension "${EXTENSION_NAME}" is now active!`
   );
 
-  const analyzer = new DartAnalyzer(
-    getDefaultGeneratorConfig(getExtensionConfig()),
-    {
-      fsControl: new VsCodeFileSystem(),
-    }
-  );
+  const analyzer = new DartAnalyzer(getExtensionConfig(), {
+    fsControl: new VsCodeFileSystem(),
+  });
 
   const fixerDiagnostics =
     vscode.languages.createDiagnosticCollection("dart-fixer");
@@ -93,6 +90,7 @@ export function activate(context: vscode.ExtensionContext): void {
     fixerDiagnostics,
     analyzer
   );
+
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { language: "dart", scheme: "file" },
@@ -208,7 +206,7 @@ export function activate(context: vscode.ExtensionContext): void {
           if (result.success) {
             const config = result.value;
             // TODO: use path pathFromUri(uri)
-            analyzer.updateConfig(getDefaultGeneratorConfig(config));
+            analyzer.updateConfig(config);
             await jsonCodeActions.updateConfig(config);
           } else {
             console.log(result.getErrorMessage());
@@ -237,7 +235,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async () => {
       const c = getExtensionConfig();
-      analyzer.updateConfig(getDefaultGeneratorConfig(c));
+      analyzer.updateConfig(c);
       await jsonCodeActions.updateConfig(c);
     })
   );
