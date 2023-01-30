@@ -33,7 +33,6 @@ dart_fixer:
       inputPath: lib/models/typedefs
       outputPath: lib/models/typedefs/
       inputKind: typeDefinition
-      
     single:
       generatorConfig: noBuilder
       inputPath: lib/models/single
