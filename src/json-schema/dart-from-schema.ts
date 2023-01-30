@@ -126,7 +126,7 @@ const mapJsonSchemaListType = (
 
 const mapJsonSchemaType = (
   ctx: JsonSchemaCtx,
-  schema: SomeJSONSchema & Partial<Nullable<EnumValue>>,
+  schema: SomeJSONSchema,
   opts?: { initial?: boolean }
 ): DartClass | DartEnum | { name: string } => {
   if (schema.$ref && ctx.typeById.has(schema.$ref)) {
@@ -155,7 +155,10 @@ const mapJsonSchemaType = (
   let result: DartClass | DartEnum | { name: string } | undefined;
 
   if ("enum" in schema && schema.enum) {
-    const dartEnum = mapDartEnumFromJsonSchema(customName, schema.enum);
+    const dartEnum = mapDartEnumFromJsonSchema(
+      customName,
+      schema.enum as Array<EnumValue>
+    );
     ctx.enums.set(dartEnum.name, dartEnum);
     result = dartEnum;
   } else if ("$ref" in schema && schema.$ref) {
@@ -243,14 +246,21 @@ const mapJsonSchemaType = (
       result = {
         name: `${dartType.name}${question}`,
       };
+    } else {
+      result = { name: `Object${question}` };
     }
-    result = { name: `Object${question}` };
   } else if (schema.type === "number") {
     result = { name: "double" };
   } else if (schema.type === "integer") {
     result = { name: "int" };
   } else if (schema.type === "string") {
-    result = { name: "String" };
+    if (schema.format === "date-time" || schema.format === "date") {
+      // TODO: time and duration
+      result = { name: "DateTime" };
+    } else {
+      // TODO: uri, uri-reference, iri, iri-reference, regex
+      result = { name: "String" };
+    }
   } else if (schema.type === "boolean") {
     result = { name: "bool" };
   } else if (schema.type === "null") {
@@ -285,6 +295,7 @@ const mapJsonSchemaType = (
       const dartClass = new DartClass({
         name: customName,
         bracket: null,
+        comment: getComment(schema),
       });
       // TODO:
       // allOf
@@ -293,13 +304,12 @@ const mapJsonSchemaType = (
       // schema.unevaluatedProperties;
       // schema.additionalProperties;
 
+      const requiredProps = schema.required ?? [];
       dartClass.fields.push(
         ...Object.entries(schema.properties ?? {}).map(([name, type]) => {
-          const typeValue = mapJsonSchemaType(
-            addPathToCtx(name, ctx),
-            // TODO:
-            (type ?? { type: "null" }) as SomeJSONSchema
-          );
+          // TODO:
+          const _type = (type ?? { type: "null" }) as SomeJSONSchema;
+          const typeValue = mapJsonSchemaType(addPathToCtx(name, ctx), _type);
           return new DartField(
             {
               isFinal: true,
@@ -307,7 +317,11 @@ const mapJsonSchemaType = (
               name,
               type:
                 typeValue.name +
-                ((schema.required ?? []).includes(name) ? "" : question),
+                (typeValue.name.endsWith(question) ||
+                requiredProps.includes(name)
+                  ? ""
+                  : question),
+              comment: getComment(_type),
             },
             dartClass
           );
@@ -365,6 +379,10 @@ function mergeTypes(type: string | null, prevType: string): string | null {
   }
   return type;
 }
+
+const getComment = (type: SomeJSONSchema): string | undefined => {
+  return type.description?.replace(/([^|\n][^\n]*)/g, "/// $1");
+};
 
 type EnumValue = string | number | bigint | boolean | object | null | undefined;
 

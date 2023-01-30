@@ -5,11 +5,9 @@ import {
   DartMetadata,
   DartType,
 } from "../dart-base/parser";
-import { JSONSchemaType, Known, Nullable } from "./schema-type";
+import { JSONSchemaType, Known } from "./schema-type";
 
-type JSONSchemaT =
-  | (JSONSchemaType<Known> | object) &
-      Partial<Nullable<unknown>> & { $schema?: string };
+type JSONSchemaT = (JSONSchemaType<Known> | object) & { $schema?: string };
 
 export class JsonSchemaFromDart {
   constructor(public allTypes: Map<string, JsonTypeDartSpec>) {}
@@ -53,7 +51,7 @@ export class JsonSchemaFromDart {
             enum: entries.map(([key]) => key),
           },
         },
-        oneOf: entries.map<JSONSchemaT>(([key, value]) => {
+        oneOf: entries.map<JSONSchemaType<Known>>(([key, value]) => {
           const p = this.dartModelToJsonTypeDefinition(value);
 
           if ("properties" in p) {
@@ -151,7 +149,7 @@ export class JsonSchemaFromDart {
     }
 
     if (t.isNullable) {
-      result.nullable = true;
+      (result as JSONSchemaType<Known>).nullable = true;
     }
     return result;
   };
