@@ -1,4 +1,8 @@
-import { CleanedText, TextPosition } from "../dart-base/parser-utils";
+import {
+  BracketWithOriginal,
+  CleanedText,
+  TextPosition,
+} from "../dart-base/parser-utils";
 import { DartAnalyzer } from "../dart-base/analyzer";
 import { Range, TextDocument } from "../dart-base/file-system";
 import { DartModelPrinter } from "../dart-base/dart-model-printer";
@@ -64,6 +68,24 @@ export const getGeneratedSections = (
     }
   }
   return generatedSections;
+};
+
+export const findSectionForBracket = (
+  sections: Iterable<GeneratedSection>,
+  bracket: BracketWithOriginal
+): GeneratedSection | undefined => {
+  let foundSection: GeneratedSection | undefined;
+  for (const section of sections) {
+    if (
+      section.start.line > bracket.originalStart.line &&
+      section.start.line < bracket.originalEnd.line &&
+      section.end &&
+      section.end.line > bracket.originalEnd.line
+    ) {
+      foundSection = section;
+    }
+  }
+  return foundSection;
 };
 
 export interface JsonEditParams {

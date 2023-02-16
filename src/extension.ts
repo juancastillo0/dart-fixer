@@ -1,15 +1,20 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { DartAnalyzer } from "./dart-base/analyzer";
+import { DartAnalyzer, ParsedDartFileData } from "./dart-base/analyzer";
 import { parsePubspec } from "./dart-base/dart-dependencies";
 import { CommentsCodeActions } from "./dart-docs/vscode-docs-diagnostic";
 import {
   ExtensionConfig,
   extensionConfigValidate,
-  getDefaultGeneratorConfig,
+  getGenerationOptionsByName,
 } from "./extension-config";
-import { GeneratedSection, JsonFileKind } from "./generator/generator-utils";
+import {
+  findSectionForBracket,
+  GeneratedSection,
+  JsonFileKind,
+  NamedGeneratorConfig,
+} from "./generator/generator-utils";
 import {
   executeJsonToDartCommand,
   JsonTypeDefinitionDartCodeActionProvider,
@@ -23,6 +28,7 @@ import {
   VsCodeFileSystem,
 } from "./vscode-utils";
 import { parseYamlOrJson } from "./utils";
+import { DartClass } from "./dart-base/parser";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
@@ -362,7 +368,7 @@ const actionsForDocument = async (
   return actionsList;
 };
 
-class DartCodeActionProvider implements vscode.CodeActionProvider {
+export class DartCodeActionProvider implements vscode.CodeActionProvider {
   constructor(
     public diagnosticCollection: vscode.DiagnosticCollection,
     public analyzer: DartAnalyzer
@@ -403,17 +409,10 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
         originalEnd.line,
         originalEnd.column
       );
-      let foundSection: GeneratedSection | undefined;
-      for (const section of data.generatedSections.values()) {
-        if (
-          section.start.line > originalStart.line &&
-          section.start.line < originalEnd.line &&
-          section.end &&
-          section.end.line > originalEnd.line
-        ) {
-          foundSection = section;
-        }
-      }
+      const foundSection = findSectionForBracket(
+        data.generatedSections.values(),
+        dartClass.bracket!
+      );
       // if !foundSection then there will be no diagnostic
       if (!classRange.contains(range) && !foundSection) {
         continue;
@@ -423,37 +422,41 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
         "Generate Class Helpers",
         vscode.CodeActionKind.QuickFix
       );
-      const generator = new ClassGenerator(data.config ?? {}, {
-        analyzer: this.analyzer,
-        outputFile: pathFromUri(document.uri),
-      });
-      const { content, md5Hash } = generator.generate(dartClass);
-      let rangeToEdit = new vscode.Range(
-        originalEnd.line,
-        originalEnd.column,
-        originalEnd.line,
-        originalEnd.column + 1
+      const edit = this.getEditAndDiagnostic(
+        data,
+        dartClass,
+        document,
+        foundSection
       );
-      if (foundSection) {
-        if (foundSection.md5Hash !== md5Hash) {
-          const diagnostic = createOutOfDateDiagnostic(document, foundSection);
-          diagnostics.push(diagnostic);
-          action.diagnostics = [diagnostic];
-        }
-        rangeToEdit = new vscode.Range(
-          foundSection.start.line,
-          0,
-          foundSection.end!.line + 1,
-          0
-        );
+      action.edit = edit.edit;
+      if (edit.diagnostic) {
+        action.diagnostics = [edit.diagnostic];
+        diagnostics.push(edit.diagnostic);
       }
-
-      action.edit = new vscode.WorkspaceEdit();
-      action.edit.replace(document.uri, rangeToEdit, content);
       action.isPreferred = true;
       // Only show action within a class
       if (classRange.intersection(range)) {
         actions.push(action);
+        if (
+          this.analyzer.globalConfig?.generator &&
+          !foundSection?.comment?.generator
+        ) {
+          Object.entries(this.analyzer.globalConfig?.generator).forEach(
+            ([k]) => {
+              // TODO: test, don't show it it is the already generated generatorConfig in [action]
+              const actionForGenerator = new vscode.CodeAction(
+                `Generate Class Helpers: ${k}`,
+                vscode.CodeActionKind.QuickFix
+              );
+              actionForGenerator.command = COMMAND_GENERATE_DART_CLASS_HELPERS({
+                generatorConfig: k,
+                className: dartClass.name,
+                uri: pathFromUri(document.uri),
+              });
+              actions.push(actionForGenerator);
+            }
+          );
+        }
       }
     }
 
@@ -462,6 +465,64 @@ class DartCodeActionProvider implements vscode.CodeActionProvider {
     }
     return actions;
   }
+
+  getEditAndDiagnostic = (
+    data: ParsedDartFileData,
+    dartClass: DartClass,
+    document: vscode.TextDocument,
+    foundSection: GeneratedSection | undefined,
+    opts?: {
+      generatorConfig?: NamedGeneratorConfig;
+    }
+  ): {
+    edit: vscode.WorkspaceEdit;
+    diagnostic: vscode.Diagnostic | undefined;
+  } => {
+    const generatorOption = getGenerationOptionsByName(
+      foundSection?.comment?.generator,
+      this.analyzer.globalConfig
+    );
+    const generator = new ClassGenerator(
+      opts?.generatorConfig?.config ??
+        generatorOption?.config ??
+        data.config ??
+        {},
+      {
+        analyzer: this.analyzer,
+        outputFile: pathFromUri(document.uri),
+      },
+      {
+        ...(foundSection?.comment ?? {}),
+        generator: opts?.generatorConfig
+          ? opts?.generatorConfig.name
+          : foundSection?.comment?.generator,
+      }
+    );
+    const { content, md5Hash } = generator.generate(dartClass);
+    const originalEnd = dartClass.bracket!.originalEnd;
+    let rangeToEdit = new vscode.Range(
+      originalEnd.line,
+      originalEnd.column,
+      originalEnd.line,
+      originalEnd.column + 1
+    );
+    let diagnostic: vscode.Diagnostic | undefined;
+    if (foundSection) {
+      if (foundSection.md5Hash !== md5Hash) {
+        diagnostic = createOutOfDateDiagnostic(document, foundSection);
+      }
+      rangeToEdit = new vscode.Range(
+        foundSection.start.line,
+        0,
+        foundSection.end!.line + 1,
+        0
+      );
+    }
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(document.uri, rangeToEdit, content);
+    return { edit, diagnostic };
+  };
 
   // resolveCodeAction(
   //   codeAction: vscode.CodeAction,
