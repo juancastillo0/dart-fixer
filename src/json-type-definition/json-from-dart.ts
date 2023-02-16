@@ -51,7 +51,9 @@ export class JsonTypeDefFromDart {
           ? [...dartType.variants.entries()]
           : Object.entries(dartType.variants)
         ).reduce<Record<string, SomeJTDSchemaTypeObject>>((p, [key, value]) => {
-          p[key] = this.dartModelToJsonTypeDefinition(value) as SomeJTDSchemaTypeObject;
+          p[key] = this.dartModelToJsonTypeDefinition(
+            value
+          ) as SomeJTDSchemaTypeObject;
           return p;
         }, {}),
       };

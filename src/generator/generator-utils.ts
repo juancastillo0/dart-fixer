@@ -8,17 +8,22 @@ import {
   dartTypeFromJsonTypeDefinition,
   JsonSchemaCtx,
 } from "../json-type-definition/dart-from-json";
-import { ClassGenerator } from "./generator";
+import { ClassGenerator, ClassGeneratorComment } from "./generator";
 import { createHash } from "crypto";
 import {
   jsonSchemaValidator,
   jsonTypeDefinitionValidator,
   parseYamlOrJson,
+  recase,
+  TextCase,
+  textCaseValues,
 } from "../utils";
 import { GenerationOptions } from "./generator-config";
+import { DartClass } from "../dart-base/parser";
 
 export interface GeneratedSection {
   md5Hash: string;
+  comment: ClassGeneratorComment;
   start: TextPosition;
   end?: TextPosition;
 }
@@ -38,14 +43,13 @@ export const getGeneratedSections = (
     const isStart = match.groups!["kind"] === "start";
     try {
       const dataString = match.groups!["json"];
-      const data = JSON.parse(dataString) as {
-        md5Hash: string | undefined;
-      };
+      const data = JSON.parse(dataString) as ClassGeneratorComment;
       if (typeof data.md5Hash === "string") {
         if (isStart) {
           generatedSections.set(data.md5Hash, {
             md5Hash: data.md5Hash,
             start: linePosition,
+            comment: data,
           });
         } else if (generatedSections.has(data.md5Hash)) {
           generatedSections.get(data.md5Hash)!.end = linePosition;
@@ -117,7 +121,7 @@ export const createDartModelFromJSON = async (
     path: document.jsonFile,
     relativeTo: newFile,
   });
-  const params = {
+  const params: GenerateDartFromJsonDataArgs = {
     ctx,
     fileName,
     analyzer,
@@ -136,6 +140,7 @@ export const createDartModelFromJSON = async (
       })
     );
     if (!value.error) {
+      params.opts = { classComments: dartFileText.classComments };
       dartFileText = generateDartFileFromJsonData(params);
     }
   }
@@ -171,39 +176,88 @@ export interface NamedGeneratorConfig {
   name: string | undefined;
 }
 
-const generateDartFileFromJsonData = (params: {
+const allFieldsCase = (c: DartClass): TextCase | undefined => {
+  for (const textCase of textCaseValues) {
+    const allCase = c.fieldsNotStatic.every(
+      (f) => recase(f.name, textCase) === f.name
+    );
+    if (allCase) {
+      return textCase;
+    }
+  }
+  return undefined;
+};
+
+interface GenerateDartFromJsonDataArgs {
   ctx: JsonSchemaCtx;
   fileName: string;
   analyzer: DartAnalyzer | undefined;
   newFile: string;
   kind: JsonFileKind;
   generatorConfig: NamedGeneratorConfig | undefined;
-}): { text: string; md5Hash: string } => {
+  opts?: {
+    classComments?: Map<string, ClassGeneratorComment>;
+  };
+}
+
+const generateDartFileFromJsonData = (
+  params: GenerateDartFromJsonDataArgs
+): {
+  text: string;
+  md5Hash: string;
+  classComments: Map<string, ClassGeneratorComment>;
+} => {
   const ctx = params.ctx;
   const printer = new DartModelPrinter();
   const classes = [...ctx.classes.values()];
-  const generator = new ClassGenerator(
-    // TODO: generator options
-    params.generatorConfig?.config ?? {},
-    params.analyzer && {
-      analyzer: params.analyzer,
-      outputFile: params.newFile,
-    }
-  );
+
+  const classComments = new Map<string, ClassGeneratorComment>();
 
   const dartFileText = `\
 ${[...ctx.imports.values()].join("\n")}\
 
 ${classes
   .map(printer.printClass)
-  .map((c, i) =>
-    // for base union classes with no fields
-    classes[i].fields.length === 0
-      ? c
-      : `${c.substring(0, c.length - 1)}${
-          generator.generate(classes[i]).content
-        }`
-  )
+  .map((c, i) => {
+    const dartClass = classes[i];
+    if (dartClass.fields.length === 0) {
+      // for base union classes with no fields
+      return c;
+    }
+
+    let comment = params.opts?.classComments?.get(dartClass.name);
+    if (!comment) {
+      let textCase = allFieldsCase(dartClass);
+      if (textCase === "camelCase") {
+        textCase = undefined;
+      }
+      if (textCase) {
+        dartClass.fieldsNotStatic.forEach(
+          (f) => (f.name = recase(f.name, "camelCase"))
+        );
+      }
+
+      comment = {
+        generator: params.generatorConfig?.name,
+        jsonKeyCase: textCase,
+      };
+    }
+    classComments.set(dartClass.name, comment);
+
+    const generator = new ClassGenerator(
+      // TODO: generator options
+      params.generatorConfig?.config,
+      params.analyzer && {
+        analyzer: params.analyzer,
+        outputFile: params.newFile,
+      },
+      comment
+    );
+
+    return `${c.substring(0, c.length - 1)}${
+      generator.generate(dartClass).content
+    }`;
+  })
   .join("\n\n")}\
 ${[...ctx.enums.values()].map(printer.printEnum).join("\n\n")}\
 ${[...ctx.primitiveRefs.entries()]
@@ -221,7 +275,7 @@ ${[...ctx.primitiveRefs.entries()]
   const text = `// generated-dart-fixer-json${JSON.stringify(
     commentData
   )}\n${dartFileText}`;
-  return { text, md5Hash };
+  return { text, md5Hash, classComments };
 };
 
 const JSON_SECTION_REGEXP =

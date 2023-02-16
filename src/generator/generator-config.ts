@@ -120,6 +120,8 @@ export interface GenerationOptions {
     codeInClass?: Array<string>;
     /** Additional code outside of the class definition. */
     codeOutOfClass?: Array<string>;
+    /** The keys text case for the toJson method and fromJson factory. */
+    jsonKeyCase?: "PascalCase" | "snake_case" | "camelCase" | "CONSTANT_CASE";
   };
   /** Generates a `Model.fromJson(Map json)` factory inside the class. */
   fromJson?: {
@@ -251,6 +253,9 @@ export const generationOptionsSchema: AjvJTDSchemaType<GenerationOptions> = {
         },
         codeOutOfClass: {
           elements: { type: "string" },
+        },
+        jsonKeyCase: {
+          enum: ["PascalCase", "snake_case", "camelCase", "CONSTANT_CASE"],
         },
       },
     },

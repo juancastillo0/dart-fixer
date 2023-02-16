@@ -13,6 +13,7 @@ import {
   DartFunctionParam,
   DartType,
 } from "../dart-base/parser";
+import { recase, TextCase } from "../utils";
 import { GenerationOptions } from "./generator-config";
 
 export let question = "?";
@@ -45,17 +46,34 @@ interface GenerateAnalyzerParams {
   outputFile: string;
 }
 
+export interface ClassGeneratorComment {
+  generator?: string;
+  jsonKeyCase?: TextCase;
+  md5Hash?: string;
+}
+
 export class ClassGenerator {
   options: GenerationOptions;
   params?: GenerateAnalyzerParams;
+  commentData?: ClassGeneratorComment;
 
-  constructor(opts: GenerationOptions, params?: GenerateAnalyzerParams) {
+  constructor(
+    opts: GenerationOptions | undefined,
+    params?: GenerateAnalyzerParams,
+    commentData?: ClassGeneratorComment
+  ) {
     this.params = params;
-    this.options = { ...opts };
-    for (const [k, v] of Object.entries(defaultGenerationOptions)) {
-      if (!(k in this.options)) {
-        Object.assign(this.options, { [k]: v as object });
-      }
+    this.commentData = commentData;
+    this.options = {
+      ...(!opts || Object.keys(opts).length === 0
+        ? defaultGenerationOptions
+        : opts),
+    };
+    if (commentData?.jsonKeyCase) {
+      this.options.baseClass = {
+        ...(this.options.baseClass ?? {}),
+        jsonKeyCase: commentData?.jsonKeyCase,
+      };
     }
   }
 
@@ -86,8 +104,13 @@ ${options.builder ? this.generateBuilder(dartClass, defaultConstructor) : ""}\
 `;
     const md5Hash = createHash("md5").update(output).digest("base64");
     const data = JSON.stringify({
+      ...Object.fromEntries(
+        Object.entries(this.commentData ?? {}).filter(
+          ([_, v]) => v !== undefined && v !== null
+        )
+      ),
       md5Hash,
-    });
+    } as ClassGeneratorComment);
 
     const generatedConstructor = dartClass.defaultConstructor
       ? ""
@@ -145,8 +168,11 @@ ${isMap ? "" : "  final json = _json as Map;\n"}\
           dartType?: null;
         }
   ): string => {
+    const jsonKeyCase = this.options.baseClass?.jsonKeyCase;
     const param = options.param;
-    const getter = options.getter ?? `json["${param!.name}"]`;
+    const getter =
+      options.getter ??
+      `json["${jsonKeyCase ? recase(param!.name, jsonKeyCase) : param!.name}"]`;
     const pType = param?.type ?? "dynamic";
     const dartType = options.dartType ?? new DartType(pType);
     if (dartType.text === "dynamic" || dartType.text === `Object${question}`) {
@@ -211,7 +237,10 @@ ${isMap ? "" : "  final json = _json as Map;\n"}\
           }
         }
         if (!argType && typeDef.kind === DartDefKind.enum) {
-          return `${nullableCast}${dartType.text}.values.byName(${getter} as String)`;
+          return `${nullableCast}${dartType.text.replace(
+            "?",
+            ""
+          )}.values.byName(${getter} as String)`;
         }
       }
     }
@@ -227,6 +256,7 @@ ${isMap ? "" : "  final json = _json as Map;\n"}\
   };
 
   generateToJson = (fieldsNotStatic: Array<DartField>): string => {
+    const keyCase = this.options.baseClass?.jsonKeyCase;
     return `
 ${this.options.toJson?.metadata ?? ""}\
 Map<String, Object${question}> toJson() {
@@ -234,7 +264,7 @@ Map<String, Object${question}> toJson() {
     ${fieldsNotStatic
       .map(
         (p) =>
-          `"${p.name}": ${this.toJsonValue({
+          `"${keyCase ? recase(p.name, keyCase) : p.name}": ${this.toJsonValue({
             name: p.name,
             dartType: p.type ? new DartType(p.type) : undefined,
           })},`
@@ -324,7 +354,7 @@ ${dartClass.name} copyWith({
     const hashMethod =
       options?.hashMethod ??
       (options?.deep ? "const DeepCollectionEquality().hash" : undefined);
-
+    // TODO: hashAll with props as param
     return `
 @override
 bool operator ==(Object other) {
@@ -353,6 +383,7 @@ int get hashCode {
   };
 
   generateToString = (dartClass: DartClass): string => {
+    // TODO: use toJson()
     return `
 ${this.options.toStringOverride?.metadata ?? ""}\
 @override
