@@ -4,17 +4,23 @@ import Ajv, {
   ValidateFunction,
 } from "ajv/dist/jtd";
 import AjvJSONSchema, { JSONSchemaType as AjvJSONSchemaType } from "ajv";
-import * as JSONTypeDefSchema_ from "./json-type-definition/json-type-definition.schema.json";
 import { camelCase, constantCase, pascalCase, snakeCase } from "change-case";
 import * as yaml from "yaml";
-import * as JSON5 from "json5";
+import JSON5 from "json5";
+import * as JSONTypeDefSchema_ from "./json-type-definition/json-type-definition.schema.json";
 import { JSONSchemaType } from "./json-schema/schema-type";
 import { JTDSchemaType } from "./json-type-definition/schema-type";
 
-export const recase = (
-  str: string,
-  type: "PascalCase" | "snake_case" | "camelCase" | "CONSTANT_CASE"
-): string => {
+export const textCaseValues = [
+  "PascalCase",
+  "snake_case",
+  "camelCase",
+  "CONSTANT_CASE",
+] as const;
+
+export type TextCase = typeof textCaseValues[number];
+
+export const recase = (str: string, type: TextCase): string => {
   if (!str) {
     return str;
   }
@@ -48,7 +54,7 @@ export const zipMapped = <T1, T2, O>(
 
 export { AjvJTDSchemaType };
 const globalAjv = new Ajv({
-  keywords: ["title"]
+  keywords: ["title"],
 });
 const globalJSONSchemaAjv = new AjvJSONSchema();
 
