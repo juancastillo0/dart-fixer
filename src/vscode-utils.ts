@@ -160,3 +160,6 @@ export const mapVsCodeRange = (range: vscode.Range): Range => ({
   },
   end: { column: range.end.character, line: range.end.line },
 });
+
+export const getWorkspaceFolder = (): string =>
+  vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();

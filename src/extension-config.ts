@@ -1,4 +1,7 @@
-import { JsonFileKind } from "./generator/generator-utils";
+import {
+  JsonFileKind,
+  NamedGeneratorConfig,
+} from "./generator/generator-utils";
 import {
   GenerationOptions,
   generationOptionsSchema,
@@ -12,7 +15,7 @@ export enum ErrorAnalysisBehavior {
 }
 
 /** The main configuration for the extension.
- * 
+ *
  * @example
  * ```json
  * {
@@ -52,9 +55,9 @@ export interface ExtensionConfig {
   errorAnalysisBehavior?: ErrorAnalysisBehavior;
 }
 
-/** A configuration to map a collection of models in `inputPath` with `inputExtension` of type `inputKind` 
+/** A configuration to map a collection of models in `inputPath` with `inputExtension` of type `inputKind`
  * to `outputPath` with `outputExtension` to files of type `outputKind` following the `generatorConfig`.
- * 
+ *
  * @example
  * ```json
  * {
@@ -109,7 +112,7 @@ export interface ModelMappingConfig {
 
 const modelMappingConfigSchema: AjvJTDSchemaType<ModelMappingConfig> = {
   metadata: {
-    title: "ModelMappingConfig"
+    title: "ModelMappingConfig",
   },
   optionalProperties: {
     generatorConfig: { type: "string" },
@@ -132,7 +135,7 @@ export const modelMappingConfigValidate = compileCustomValidator(
 const extensionConfigSchema: AjvJTDSchemaType<ExtensionConfig> = {
   metadata: {
     // TODO: use title for Map<string,<propName>Value> in markdown table
-    title: "ExtensionConfig"
+    title: "ExtensionConfig",
   },
   optionalProperties: {
     generatorConfig: { type: "string" },
@@ -154,6 +157,25 @@ export const getDefaultGeneratorConfig = (
     generatorConfig = extConfig.generator[extConfig?.generatorConfig];
   }
   return generatorConfig;
+};
+
+export const getGenerationOptionsByName = (
+  generatorConfig: string | undefined,
+  config: ExtensionConfig | undefined
+): NamedGeneratorConfig | undefined => {
+  const generators = config?.generator;
+  const defaultConfig = getDefaultGeneratorConfig(config);
+  return generators && generatorConfig && generatorConfig in generators
+    ? {
+        config: generators[generatorConfig],
+        name: generatorConfig,
+      }
+    : defaultConfig
+    ? {
+        config: defaultConfig,
+        name: undefined,
+      }
+    : undefined;
 };
 
 export const mergeConfig = (

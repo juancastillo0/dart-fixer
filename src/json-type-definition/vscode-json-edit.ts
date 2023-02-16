@@ -9,6 +9,7 @@ import {
 import {
   ExtensionConfig,
   getDefaultGeneratorConfig,
+  ModelMappingConfig,
 } from "../extension-config";
 import {
   createDartModelFromJSON,
@@ -19,16 +20,26 @@ import {
 } from "../generator/generator-utils";
 import {
   formatFiles,
+  getWorkspaceFolder,
   makeReplaceContentAction,
   pathFromUri,
   subscribeToDocumentChanges,
   textDocumentFromVsCode,
 } from "../vscode-utils";
 import {
+  didChangeModelMappingFiles,
   getGenerateDartFromJsonAction,
   getGeneratedJsonFromDartAction,
   getModelMappings,
+  isInputToMapping,
+  ModelMappingFiles,
+  modelMappingFiles,
 } from "./json-model-mappings";
+
+interface ModelMappingWithFiles {
+  mapping: ModelMappingConfig;
+  files: ModelMappingFiles;
+}
 
 export class JsonTypeDefinitionDartCodeActionProvider
   implements vscode.CodeActionProvider
@@ -37,6 +48,12 @@ export class JsonTypeDefinitionDartCodeActionProvider
     public diagnosticCollection: vscode.DiagnosticCollection,
     public analyzer: DartAnalyzer
   ) {}
+
+  config: ExtensionConfig | undefined;
+  // TODO: maybe remove previous outputFiles on change
+  // TODO: make getGenerateDartFromJsonAction understand single output files with multiple inputs
+  // TODO: what happens when we create a new input file?
+  modelMappings: Record<string, ModelMappingWithFiles> | undefined;
 
   static readonly metadata: vscode.CodeActionProviderMetadata = {
     providedCodeActionKinds: [
@@ -66,16 +83,14 @@ export class JsonTypeDefinitionDartCodeActionProvider
       if (action) {
         actions.push(makeReplaceContentAction(action));
       }
+      // TODO: should we have a Dart to json command like COMMAND_GENERATE_JSON_SCHEMA?
     } else if (fileType.kind === FileKind.jsonYaml) {
       const action = new vscode.CodeAction(
         "Generate Dart Type",
         vscode.CodeActionKind.QuickFix
       );
       action.isPreferred = true;
-      if (
-        fileType.schemaKind === SchemaKind.schema ||
-        document.getText().includes('"$schema":')
-      ) {
+      if (fileType.schemaKind === SchemaKind.schema) {
         action.command = COMMAND_GENERATE_JSON_SCHEMA;
       } else if (fileType.schemaKind === SchemaKind.typeDef) {
         action.command = COMMAND_GENERATE_JSON_TYPE_DEFINITION;
@@ -123,36 +138,63 @@ export class JsonTypeDefinitionDartCodeActionProvider
     if (!c?.mappings) {
       return;
     }
+    this.config = c;
 
+    this.modelMappings = Object.fromEntries(
+      await Promise.all(
+        Object.entries(c.mappings).map<
+          Promise<[string, ModelMappingWithFiles]>
+        >(async ([k, v]) => [
+          k,
+          {
+            mapping: v,
+            files: await modelMappingFiles(
+              getWorkspaceFolder(),
+              v,
+              this.analyzer
+            ),
+          },
+        ])
+      )
+    );
     const edits = await getModelMappings(
-      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd(),
+      getWorkspaceFolder(),
       c,
-      c.mappings,
+      this.modelMappings,
       this.analyzer
     );
-    const uris = new Map<string, vscode.Uri>();
-    const edit = new vscode.WorkspaceEdit();
-    edits.forEach((e) => {
-      const newUri = vscode.Uri.parse(e.uri);
-      uris.set(newUri.toString(), newUri);
-      edit.createFile(newUri, { overwrite: true });
-      edit.insert(newUri, new vscode.Position(0, 0), e.text);
-    });
-    await vscode.workspace.applyEdit(edit);
-    await formatFiles([...uris.values()]);
+    await applyMultipleEdits(edits);
   }
 }
 
+const applyMultipleEdits = async (
+  edits: Array<{
+    uri: string;
+    text: string;
+  }>
+): Promise<void> => {
+  const uris = new Map<string, vscode.Uri>();
+  const edit = new vscode.WorkspaceEdit();
+  edits.forEach((e) => {
+    const newUri = vscode.Uri.parse(e.uri);
+    uris.set(newUri.toString(), newUri);
+    edit.createFile(newUri, { overwrite: true });
+    edit.insert(newUri, new vscode.Position(0, 0), e.text);
+  });
+  await vscode.workspace.applyEdit(edit);
+  await formatFiles([...uris.values()]);
+};
+
 export const executeJsonToDartCommand = async (
   jsonKind: JsonFileKind,
-  options?: { fromClipboard?: true; analyzer: DartAnalyzer }
+  options: { fromClipboard?: true; analyzer: DartAnalyzer }
 ): Promise<boolean> => {
   const activeEditor = vscode.window.activeTextEditor;
   if (!activeEditor) {
     return false;
   }
   let params: JsonEditParams | undefined;
-  if (options?.fromClipboard) {
+  if (options.fromClipboard) {
     const text = await vscode.env.clipboard.readText();
     // TODO: use current dart file
     // let newFile = activeEditor.document.uri;
@@ -168,7 +210,8 @@ export const executeJsonToDartCommand = async (
     const document = activeEditor.document;
     const name = nameFromFile(pathFromUri(document.uri)).identifierName;
     const newUri = vscode.Uri.joinPath(document.uri, "..", `${name}.dart`);
-    const config = getDefaultGeneratorConfig(options?.analyzer?.globalConfig);
+    const config = getDefaultGeneratorConfig(options.analyzer?.globalConfig);
+    // TODO: test generation with default config
     const dartFileText = await createDartModelFromJSON(
       params ?? {
         newFile: pathFromUri(newUri),
@@ -176,7 +219,7 @@ export const executeJsonToDartCommand = async (
         jsonFile: pathFromUri(document.uri),
       },
       jsonKind,
-      options?.analyzer,
+      options.analyzer,
       config ? { config, name: undefined } : undefined
     );
 

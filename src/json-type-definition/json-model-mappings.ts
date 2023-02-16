@@ -1,3 +1,4 @@
+import minimatch from "minimatch";
 import * as path from "path";
 import { DartAnalyzer } from "../dart-base/analyzer";
 import {
@@ -6,7 +7,12 @@ import {
   getFileType,
   TextDocument,
 } from "../dart-base/file-system";
-import { ExtensionConfig, ModelMappingConfig } from "../extension-config";
+import {
+  ExtensionConfig,
+  getGenerationOptionsByName,
+  ModelMappingConfig,
+} from "../extension-config";
+
 import {
   createDartModelFromJSON,
   getCommentGeneratedDartFromJson,
@@ -30,13 +36,12 @@ const asRelativeDir = (p: string): string => {
   return (p.startsWith("/") ? p.slice(1) : p) + (p.endsWith("/") ? "" : "/");
 };
 
-const getFiles = async (args: {
+const getFiles = (args: {
   path: string;
   isDart: boolean;
   folder: string;
-  analyzer: DartAnalyzer;
   extension: string | undefined;
-}): Promise<Array<string>> => {
+}): Array<string> | { glob: string } => {
   let fileType: FileExtensionInfo | undefined;
   if (isFile(args.path)) {
     fileType = getFileType(args.path);
@@ -64,7 +69,22 @@ const getFiles = async (args: {
   const inputGlob = `${inputDir}**/*.${
     args.extension ?? (args.isDart ? "dart" : "json")
   }`;
-  return args.analyzer.fsControl.findFiles(inputGlob);
+  return { glob: inputGlob };
+};
+
+export const isInputToMapping = (
+  file: string,
+  values: { mapping: ModelMappingConfig; folder: string }
+): boolean => {
+  const v = values.mapping;
+  const out = getFiles({
+    path: v.inputPath,
+    extension: v.inputExtension,
+    folder: values.folder,
+    isDart: v.inputKind === "dart",
+  });
+
+  return Array.isArray(out) ? out.includes(file) : minimatch(file, out.glob);
 };
 
 const mergeOutputs = (
@@ -107,37 +127,108 @@ const mergeOutputs = (
   );
 };
 
-export const isInputToMapping = async (
-  file: string,
-  args: {
-    folder: string;
-    analyzer: DartAnalyzer;
-    mapping: ModelMappingConfig;
-  }
-): Promise<boolean> => {
-  const mapping = args.mapping;
-  const isDartOutput = mapping.inputKind !== "dart";
-  const inputFiles = await getFiles({
-    path: mapping.inputPath,
-    analyzer: args.analyzer,
-    extension: mapping.inputExtension,
-    folder: args.folder,
-    isDart: !isDartOutput,
-  });
-  return inputFiles.includes(file);
+export interface ModelMappingFiles {
+  inputFiles: Array<string>;
+  outputFiles: Array<string>;
+  singleFileOutput: string | undefined;
+}
+
+export interface ModelMappingFilChanges {
+  didChange: boolean;
+  singleFileOutput: string | undefined;
+  deletedInputFiles: Array<string> | undefined;
+  deletedOutputFiles: Array<string> | undefined;
+  addedInputFiles: Array<string> | undefined;
+  addedOutputFiles: Array<string> | undefined;
+}
+
+export const didChangeModelMappingFiles = (
+  a: ModelMappingFiles,
+  b: ModelMappingFiles
+): ModelMappingFilChanges => {
+  const singleFileOutput =
+    a.singleFileOutput !== b.singleFileOutput ? b.singleFileOutput : undefined;
+  const deletedInputFiles = a.inputFiles.filter(
+    (f) => !b.inputFiles.includes(f)
+  );
+  const deletedOutputFiles = a.outputFiles.filter(
+    (f) => !b.outputFiles.includes(f)
+  );
+  const addedInputFiles = b.inputFiles.filter((f) => !a.inputFiles.includes(f));
+  const addedOutputFiles = b.outputFiles.filter(
+    (f) => !a.outputFiles.includes(f)
+  );
+  const didChange =
+    !!singleFileOutput ||
+    deletedInputFiles.length > 0 ||
+    deletedOutputFiles.length > 0 ||
+    addedInputFiles.length > 0 ||
+    addedOutputFiles.length > 0;
+
+  return {
+    didChange,
+    singleFileOutput,
+    deletedInputFiles:
+      deletedInputFiles.length > 0 ? deletedInputFiles : undefined,
+    deletedOutputFiles:
+      deletedOutputFiles.length > 0 ? deletedOutputFiles : undefined,
+    addedInputFiles: addedInputFiles.length > 0 ? addedInputFiles : undefined,
+    addedOutputFiles:
+      addedOutputFiles.length > 0 ? addedOutputFiles : undefined,
+  };
+};
+
+export const modelMappingFiles = async (
+  folder: string,
+  v: ModelMappingConfig,
+  analyzer: DartAnalyzer
+): Promise<ModelMappingFiles> => {
+  const isDartOutput = v.inputKind !== "dart";
+  const [inputFiles, outputFiles] = await Promise.all([
+    getFiles({
+      path: v.inputPath,
+      extension: v.inputExtension,
+      folder,
+      isDart: !isDartOutput,
+    }),
+    getFiles({
+      path: v.outputPath,
+      extension: v.outputExtension,
+      folder,
+      isDart: isDartOutput,
+    }),
+  ]);
+
+  return {
+    inputFiles: Array.isArray(inputFiles)
+      ? inputFiles
+      : await analyzer.fsControl.findFiles(inputFiles.glob),
+    outputFiles: Array.isArray(outputFiles)
+      ? outputFiles
+      : await analyzer.fsControl.findFiles(outputFiles.glob),
+    singleFileOutput: isFile(v.outputPath)
+      ? (outputFiles as Array<string>)[0]
+      : undefined,
+  };
 };
 
 export const getModelMappings = async (
   folder: string,
   config: ExtensionConfig,
-  mappings: Record<string, ModelMappingConfig>,
+  mappings: Record<
+    string,
+    | ModelMappingConfig
+    | { mapping: ModelMappingConfig; files: ModelMappingFiles }
+  >,
   analyzer: DartAnalyzer
 ): Promise<Array<{ uri: string; text: string }>> => {
   const edits: Array<{ uri: string; text: string }> = [];
 
   // TODO: get info from pubspec
   await Promise.all(
-    Object.entries(mappings).map(async ([, v]) => {
+    Object.entries(mappings).map(async ([, m]) => {
+      const v = "files" in m ? m.mapping : m;
+
       const generatorConfigV = v.generatorConfig
         ? config.generator?.[v.generatorConfig]
         : undefined;
@@ -146,27 +237,12 @@ export const getModelMappings = async (
         : undefined;
       const isDartOutput = v.inputKind !== "dart";
 
-      const [inputFiles, outputFiles] = await Promise.all([
-        getFiles({
-          path: v.inputPath,
-          analyzer,
-          extension: v.inputExtension,
-          folder,
-          isDart: !isDartOutput,
-        }),
-        getFiles({
-          path: v.outputPath,
-          analyzer,
-          extension: v.outputExtension,
-          folder,
-          isDart: isDartOutput,
-        }),
-      ]);
-      const outputFilesSet = new Set(outputFiles);
+      const { inputFiles, singleFileOutput } =
+        "files" in m ? m.files : await modelMappingFiles(folder, v, analyzer);
+      // const outputFilesSet = new Set(outputFiles);
       const outputKind = v.outputKind ?? JsonFileKind.schema;
       // TODO: test on file added
-      if (isFile(v.outputPath)) {
-        const outputFile = outputFiles[0];
+      if (singleFileOutput) {
         // TODO:
         // if (outputFilesSet.has(outputFile)) {
         //   // already created
@@ -178,7 +254,7 @@ export const getModelMappings = async (
             generateOutput(
               {
                 file,
-                outputFile,
+                outputFile: singleFileOutput,
                 inputKind: v.inputKind,
                 outputKind,
                 generatorConfig,
@@ -200,12 +276,12 @@ export const getModelMappings = async (
           text = mergedOutput.value.join("\n\n");
         } else {
           text = printYamlOrJson({
-            uri: outputFile,
+            uri: singleFileOutput,
             document: mergedOutput.value,
           });
         }
 
-        edits.push({ uri: outputFile, text });
+        edits.push({ uri: singleFileOutput, text });
       } else {
         const outputExtension =
           v.outputExtension ??
@@ -224,10 +300,10 @@ export const getModelMappings = async (
             config: dataConfig,
           });
           // TODO: should we do this?
-          if (outputFilesSet.has(outputFile)) {
-            // already created
-            continue;
-          }
+          // if (outputFilesSet.has(outputFile)) {
+          //   // already created
+          //   continue;
+          // }
 
           const output = await generateOutput(
             {
@@ -374,8 +450,6 @@ export const getGenerateDartFromJsonAction = async (
   const jsonDoc = await analyzer.fsControl.openTextDocument(
     path.join(document.uri, "..", comment.from)
   );
-  const generatorConfig = comment.generatorConfig;
-  const generators = analyzer.globalConfig?.generator;
   const generated = await createDartModelFromJSON(
     {
       text: jsonDoc.text,
@@ -384,12 +458,7 @@ export const getGenerateDartFromJsonAction = async (
     },
     comment.kind,
     analyzer,
-    generators && generatorConfig && generatorConfig in generators
-      ? {
-          config: generators[generatorConfig],
-          name: generatorConfig,
-        }
-      : undefined
+    getGenerationOptionsByName(comment.generatorConfig, analyzer.globalConfig)
   );
   if (generated.md5Hash === comment.md5Hash) {
     return undefined;
