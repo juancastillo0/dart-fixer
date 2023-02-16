@@ -16,6 +16,7 @@ import { createUnionClass, UnionKind } from "../generator/dart-model-utils";
 import { question } from "../generator/generator";
 import { recase } from "../utils";
 import { Known, Nullable, PartialSchema, SomeJSONSchema } from "./schema-type";
+import { mapCommentToMaxLineLength } from "../dart-docs/comment-utils";
 
 export const dartTypeFromJsonSchema = (
   schema: SomeJSONSchema,
@@ -239,10 +240,12 @@ const mapJsonSchemaType = (
         | "string"
         | "number"
         | "boolean"
-        | "integer";
+        | "integer"
+        | "array";
       const dartType = mapJsonSchemaType(ctx, {
+        ...schema,
         type: realType,
-      });
+      } as SomeJSONSchema);
       result = {
         name: `${dartType.name}${question}`,
       };
@@ -380,8 +383,42 @@ function mergeTypes(type: string | null, prevType: string): string | null {
   return type;
 }
 
+// TODO:  improve any of with null
+// "user": {
+//   "anyOf": [
+//     {
+//       "type": "null"
+//     },
+//     {
+//       "title": "Simple User",
+//       "description": "A GitHub user.",
+//       "type": "object",
+
 const getComment = (type: SomeJSONSchema): string | undefined => {
-  return type.description?.replace(/([^|\n][^\n]*)/g, "/// $1");
+  // TODO: use examples and format
+  // TODO: add newline for comments of more than 80 chars
+  // TODO: add comment for constructor from class comment
+  // TODO: add comment for enums from field comments
+  const sections: Array<string> = [];
+  if (type.description) {
+    sections.push(type.description.replace(/([^|\n][^\n]*)/g, "/// $1"));
+  }
+  if (type.examples && type.examples.length > 0) {
+    sections.push(
+      ...type.examples.map(
+        (v, i) =>
+          `/// #### Example ${
+            type.examples!.length > 1 ? i + 1 : ""
+          }\n/// \`\`\`json\n/// ` +
+          JSON.stringify(v, null, 2).replace(/\n/g, "\n/// ") +
+          "\n/// ```"
+      )
+    );
+  }
+  if (sections.length > 0) {
+    return mapCommentToMaxLineLength(sections.join("\n///\n"));
+  }
+  return undefined;
 };
 
 type EnumValue = string | number | bigint | boolean | object | null | undefined;

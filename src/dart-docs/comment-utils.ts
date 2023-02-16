@@ -66,3 +66,39 @@ export const rangeFromSection = (
   };
   return range;
 };
+
+export const mapCommentToMaxLineLength = (
+  comment: string,
+  opts: { chars: number; prefix: string } = { chars: 76, prefix: "/// " }
+): string => {
+  const lines = comment.split("\n");
+  if (lines.length > 1) {
+    return lines.map((c) => mapCommentToMaxLineLength(c, opts)).join("\n");
+  }
+  const line = lines[0];
+  if (line.length <= opts.chars) {
+    return line;
+  }
+  const words = line.split(" ");
+  const output: Array<string> = [];
+  let i = 0;
+  let current: Array<string> = [];
+  let size = 0;
+  while (i < words.length) {
+    const word = words[i];
+    if (size + word.length > opts.chars) {
+      output.push(current.join(" "));
+      current = [];
+      size = 0;
+    }
+    current.push(words[i]);
+    // +1 for space
+    size += word.length + 1;
+    i++;
+  }
+  if (size > 0) {
+    output.push(current.join(" "));
+  }
+
+  return output.join("\n" + opts.prefix);
+};
