@@ -72,13 +72,35 @@ export function subscribeToDocumentChanges(
       refreshDiagnostics(e.document)
     )
   );
-
   // context.subscriptions.push(
   //   vscode.workspace.onDidCloseTextDocument((doc) =>
   //     this.collection.delete(doc.uri)
   //   )
   // );
 }
+
+export const subscribeToFileSystemChanges = (
+  context: vscode.ExtensionContext,
+  args: {
+    globPattern: vscode.GlobPattern;
+    ignoreCreate?: boolean | undefined;
+    ignoreChange?: boolean | undefined;
+    ignoreDelete?: boolean | undefined;
+  },
+  fn: (event: { type: "create" | "change" | "delete"; uri: string }) => void
+): void => {
+  const watcher = vscode.workspace.createFileSystemWatcher(
+    args.globPattern,
+    args.ignoreChange,
+    args.ignoreCreate,
+    args.ignoreDelete
+  );
+
+  watcher.onDidChange((uri) => fn({ type: "change", uri: pathFromUri(uri) }));
+  watcher.onDidCreate((uri) => fn({ type: "create", uri: pathFromUri(uri) }));
+  watcher.onDidDelete((uri) => fn({ type: "delete", uri: pathFromUri(uri) }));
+  context.subscriptions.push(watcher);
+};
 
 export const formatFiles = async (
   uris: Array<vscode.Uri>

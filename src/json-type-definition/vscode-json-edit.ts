@@ -74,6 +74,36 @@ export class JsonTypeDefinitionDartCodeActionProvider
     console.log("JTD", document.uri);
     const fileType = textDocument.fileExtension;
     const actions: Array<vscode.CodeAction> = [];
+    if (this.modelMappings) {
+      const mapping = Object.entries(this.modelMappings).find(
+        ([_, m]) =>
+          m.files.inputFiles.includes(textDocument.uri) ||
+          m.files.outputFiles.includes(textDocument.uri)
+      );
+
+      if (mapping) {
+        const edits = await getModelMappings(
+          getWorkspaceFolder(),
+          this.config!,
+          { [mapping[0]]: mapping[1] },
+          this.analyzer
+        );
+        if (edits.length > 0) {
+          const action = makeReplaceContentAction({
+            document: textDocument,
+            // TODO: name
+            name: "",
+            text: edits[0].text,
+            diagnostic: {
+              document: textDocument,
+              message: "",
+            },
+          });
+          actions.push(action);
+          return actions;
+        }
+      }
+    }
     // TODO: diagnostics
     if (fileType.kind === FileKind.dart) {
       const action = await getGenerateDartFromJsonAction(
@@ -129,6 +159,63 @@ export class JsonTypeDefinitionDartCodeActionProvider
 
       if (action?.diagnostics || this.diagnosticCollection.has(document.uri)) {
         this.diagnosticCollection.set(document.uri, action?.diagnostics ?? []);
+      }
+
+      if (this.modelMappings) {
+        const toEdit = Object.entries(this.modelMappings).filter(([_, v]) =>
+          isInputToMapping(doc.uri, {
+            folder: getWorkspaceFolder(),
+            mapping: v.mapping,
+          })
+        );
+
+        const values = await Promise.all(
+          toEdit.map(async ([k, v]) => ({
+            k,
+            v,
+            files: await modelMappingFiles(
+              getWorkspaceFolder(),
+              v.mapping,
+              this.analyzer
+            ),
+          }))
+        );
+
+        const edit = new vscode.WorkspaceEdit();
+        const edits: Array<{
+          uri: string;
+          text: string;
+        }> = [];
+        for (const v of values) {
+          const changes = didChangeModelMappingFiles(v.v.files, v.files);
+
+          if (changes.didChange) {
+            const newValue = { mapping: v.v.mapping, files: v.files };
+            this.modelMappings[v.k] = newValue;
+
+            changes.deletedOutputFiles?.map((file) =>
+              edit.deleteFile(vscode.Uri.parse(file))
+            );
+            if (
+              changes.addedInputFiles ||
+              changes.deletedInputFiles ||
+              changes.addedOutputFiles
+            ) {
+              const fileEdits = await getModelMappings(
+                getWorkspaceFolder(),
+                this.config!,
+                { [v.k]: newValue },
+                this.analyzer
+              );
+              edits.push(...fileEdits);
+            }
+          } else {
+            throw new Error(`Should have changed ${JSON.stringify(v)}`);
+          }
+        }
+
+        await vscode.workspace.applyEdit(edit);
+        await applyMultipleEdits(edits);
       }
     });
   }
