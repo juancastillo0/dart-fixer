@@ -17,7 +17,8 @@
     "onCommand:dart-fixer.dartModelFromJsonSchema",
     "onCommand:dart-fixer.dartModelFromJsonDocument",
     "onCommand:dart-fixer.findAllErrors",
-    "onCommand:dart-fixer.fixAllErrors"
+    "onCommand:dart-fixer.fixAllErrors",
+    "onCommand:dart-fixer.dartClassHelpers"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -45,6 +46,10 @@
       {
         "command": "dart-fixer.fixAllErrors",
         "title": "Dart Fixer: Fix source code errors"
+      },
+      {
+        "command": "dart-fixer.dartClassHelpers",
+        "title": "Dart Fixer: Generate Dart class helpers"
       }
     ],
     "menus": {
@@ -64,6 +69,10 @@
         {
           "command": "dart-fixer.dartModelFromJsonDocument",
           "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.dartClassHelpers",
+          "when": "editorLangId == dart"
         },
         {
           "command": "dart-fixer.findAllErrors"
@@ -88,6 +97,10 @@
         {
           "command": "dart-fixer.dartModelFromJsonDocument",
           "when": "editorLangId == json"
+        },
+        {
+          "command": "dart-fixer.dartClassHelpers",
+          "when": "editorLangId == dart"
         },
         {
           "command": "dart-fixer.findAllErrors"

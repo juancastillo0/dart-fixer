@@ -29,6 +29,7 @@ import {
 } from "./vscode-utils";
 import { parseYamlOrJson } from "./utils";
 import { DartClass } from "./dart-base/parser";
+import { commandGenerateDartClassHelpersFunction } from "./generator/vscode-dart-fixer";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
@@ -48,6 +49,21 @@ export const COMMAND_GENERATE_JSON_DOCUMENT: vscode.Command = {
   tooltip: "Generate Dart Model from JSON Model Document",
 };
 
+export interface DartClassHelpersCommandArgs {
+  generatorConfig?: string;
+  className?: string;
+  uri?: string;
+}
+
+export const COMMAND_GENERATE_DART_CLASS_HELPERS = (
+  args?: DartClassHelpersCommandArgs
+): vscode.Command => ({
+  command: `${EXTENSION_NAME}.dartClassHelpers`,
+  title: "Dart Fixer: Generate Dart class helpers",
+  tooltip: "Generate Dart class helpers",
+  arguments: [args],
+});
+
 export const COMMAND_LINT_ALL: vscode.Command = {
   command: `${EXTENSION_NAME}.findAllErrors`,
   title: "Dart Fixer: Lint - Find source code errors",
@@ -59,6 +75,12 @@ export const COMMAND_FIX_ALL: vscode.Command = {
   title: "Dart Fixer: Fix source code errors",
   tooltip: "Fix source code errors",
 };
+// TODO: generate helpers for all classes asking for generator config
+// TODO: add code action for every generator config
+// TODO: support '' and "" strings, based on analysis_options.yaml
+// TODO: support snake_case and camelCase conversion in toJson
+// TODO: support editing configuration in comment (generatorConfig, camelCase conversion)
+// TODO: 'type' property name in Field enum is the same as a field name in class
 
 const COMMAND_OBJECT: vscode.Command = {
   command: COMMAND,
@@ -144,6 +166,13 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       COMMAND_GENERATE_JSON_DOCUMENT.command,
       () => executeJsonToDartCommand(JsonFileKind.document, { analyzer })
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      COMMAND_GENERATE_DART_CLASS_HELPERS().command,
+      commandGenerateDartClassHelpersFunction(analyzer, dartFixerCodeActions)
     )
   );
 
