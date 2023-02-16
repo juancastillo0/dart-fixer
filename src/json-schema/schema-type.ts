@@ -60,6 +60,10 @@ type UncheckedJSONSchemaType<T, IsPartial extends boolean> = (
         ? JSONType<"string", IsPartial>
         : T extends boolean
         ? JSONType<"boolean", IsPartial>
+        : T extends Array<unknown>
+        ? JSONType<"array", IsPartial>
+        : T extends null
+        ? JSONType<"null", IsPartial>
         : never)[];
     } & UnionToIntersection<
       T extends number

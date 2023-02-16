@@ -277,51 +277,20 @@ async function printDefinitionsForActiveEditor(): Promise<void> {
   console.log(definitions);
 }
 
+const allFilesToLintGlob = "**/*.{json,dart,md,mdx,yaml,yml,jsonc,json5}";
+
 const executeLintAllCommand = async (args: {
   fixAll: boolean;
   dartFixerCodeActions: DartCodeActionProvider;
   commentsCodeAction: CommentsCodeActions;
   jsonCodeActions: JsonTypeDefinitionDartCodeActionProvider;
 }): Promise<void> => {
-  const files = await vscode.workspace.findFiles("**/*.{json,dart,md,mdx}");
+  const files = await vscode.workspace.findFiles(allFilesToLintGlob);
   const allActions: Array<Array<vscode.CodeAction>> = [];
   await Promise.all(
     files.map(async (uri) => {
       const file = await vscode.workspace.openTextDocument(uri);
-
-      const source = new vscode.CancellationTokenSource();
-      // all the document's range
-      const range = new vscode.Range(
-        new vscode.Position(0, 0),
-        file.positionAt(file.getText().length)
-      );
-      const codeActionContext: vscode.CodeActionContext = {
-        triggerKind: vscode.CodeActionTriggerKind.Invoke,
-        // TODO: set diagnostics
-        diagnostics: [],
-        only: vscode.CodeActionKind.SourceFixAll,
-      };
-      const actionsList = await Promise.all([
-        file.languageId === "markdown"
-          ? []
-          : args.jsonCodeActions.provideCodeActions(file),
-        file.languageId === "dart"
-          ? args.dartFixerCodeActions.provideCodeActions(
-              file,
-              range,
-              codeActionContext,
-              source.token
-            )
-          : [],
-        file.languageId === "json"
-          ? []
-          : args.commentsCodeAction.provideCodeActions(
-              file,
-              range,
-              codeActionContext,
-              source.token
-            ),
-      ]);
+      const actionsList = await actionsForDocument(file, args);
       if (args.fixAll) {
         allActions.push(...actionsList);
       }
@@ -344,6 +313,53 @@ const executeLintAllCommand = async (args: {
     );
     await formatFiles([...editedFiles.values()]);
   }
+};
+
+const actionsForDocument = async (
+  file: vscode.TextDocument,
+  args: {
+    dartFixerCodeActions: DartCodeActionProvider;
+    commentsCodeAction: CommentsCodeActions;
+    jsonCodeActions: JsonTypeDefinitionDartCodeActionProvider;
+  }
+): Promise<Array<Array<vscode.CodeAction>>> => {
+  const source = new vscode.CancellationTokenSource();
+  // all the document's range
+  const range = new vscode.Range(
+    new vscode.Position(0, 0),
+    file.positionAt(file.getText().length)
+  );
+  const codeActionContext: vscode.CodeActionContext = {
+    triggerKind: vscode.CodeActionTriggerKind.Invoke,
+    // TODO: set diagnostics
+    diagnostics: [],
+    only: vscode.CodeActionKind.SourceFixAll,
+  };
+  const actionsList = await Promise.all([
+    vscode.languages.match(
+      JsonTypeDefinitionDartCodeActionProvider.documentSelector,
+      file
+    )
+      ? args.jsonCodeActions.provideCodeActions(file)
+      : [],
+    file.languageId === "dart"
+      ? args.dartFixerCodeActions.provideCodeActions(
+          file,
+          range,
+          codeActionContext,
+          source.token
+        )
+      : [],
+    vscode.languages.match(CommentsCodeActions.documentSelector, file)
+      ? args.commentsCodeAction.provideCodeActions(
+          file,
+          range,
+          codeActionContext,
+          source.token
+        )
+      : [],
+  ]);
+  return actionsList;
 };
 
 class DartCodeActionProvider implements vscode.CodeActionProvider {
