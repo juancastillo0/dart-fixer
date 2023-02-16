@@ -1,35 +1,26 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-import { DartAnalyzer, ParsedDartFileData } from "./dart-base/analyzer";
+import { DartAnalyzer } from "./dart-base/analyzer";
 import { parsePubspec } from "./dart-base/dart-dependencies";
 import { CommentsCodeActions } from "./dart-docs/vscode-docs-diagnostic";
-import {
-  ExtensionConfig,
-  extensionConfigValidate,
-  getGenerationOptionsByName,
-} from "./extension-config";
-import {
-  findSectionForBracket,
-  GeneratedSection,
-  JsonFileKind,
-  NamedGeneratorConfig,
-} from "./generator/generator-utils";
+import { ExtensionConfig, extensionConfigValidate } from "./extension-config";
+import { JsonFileKind } from "./generator/generator-utils";
 import {
   executeJsonToDartCommand,
   JsonTypeDefinitionDartCodeActionProvider,
 } from "./json-type-definition/vscode-json-edit";
-import { ClassGenerator } from "./generator/generator";
 import {
-  createOutOfDateDiagnostic,
   formatFiles,
   pathFromUri,
   textDocumentFromVsCode,
   VsCodeFileSystem,
 } from "./vscode-utils";
 import { parseYamlOrJson } from "./utils";
-import { DartClass } from "./dart-base/parser";
-import { commandGenerateDartClassHelpersFunction } from "./generator/vscode-dart-fixer";
+import {
+  commandGenerateDartClassHelpersFunction,
+  DartCodeActionProvider,
+} from "./generator/vscode-dart-fixer";
 
 export const EXTENSION_NAME = "dart-fixer";
 const COMMAND = `${EXTENSION_NAME}.helloWorld`;
@@ -81,12 +72,6 @@ export const COMMAND_FIX_ALL: vscode.Command = {
 // TODO: support snake_case and camelCase conversion in toJson
 // TODO: support editing configuration in comment (generatorConfig, camelCase conversion)
 // TODO: 'type' property name in Field enum is the same as a field name in class
-
-const COMMAND_OBJECT: vscode.Command = {
-  command: COMMAND,
-  title: "Fix Imports Hello",
-  tooltip: "FixImports",
-};
 
 const getExtensionConfig = (): ExtensionConfig | undefined => {
   const config = vscode.workspace.getConfiguration(`dartFixer`).get("config");
@@ -396,179 +381,6 @@ const actionsForDocument = async (
   ]);
   return actionsList;
 };
-
-export class DartCodeActionProvider implements vscode.CodeActionProvider {
-  constructor(
-    public diagnosticCollection: vscode.DiagnosticCollection,
-    public analyzer: DartAnalyzer
-  ) {}
-
-  static readonly metadata: vscode.CodeActionProviderMetadata = {
-    providedCodeActionKinds: [
-      vscode.CodeActionKind.QuickFix,
-      vscode.CodeActionKind.Refactor,
-    ],
-  };
-
-  async provideCodeActions(
-    document: vscode.TextDocument,
-    range: vscode.Range | vscode.Selection,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _: vscode.CodeActionContext,
-    token: vscode.CancellationToken
-  ): Promise<Array<vscode.CodeAction>> {
-    const result = await this.analyzer.getData(
-      textDocumentFromVsCode(document)
-    );
-    if (token.isCancellationRequested || result.error) {
-      return [];
-    }
-    const data = result.data;
-    console.log(data.values);
-
-    const actions: Array<vscode.CodeAction> = [new DartFixImportsCodeAction()];
-    const diagnostics: Array<vscode.Diagnostic> = [];
-
-    for (const dartClass of data.values.classes) {
-      const originalStart = dartClass.bracket!.originalStart;
-      const originalEnd = dartClass.bracket!.originalEnd;
-      const classRange = new vscode.Range(
-        originalStart.line,
-        originalStart.column,
-        originalEnd.line,
-        originalEnd.column
-      );
-      const foundSection = findSectionForBracket(
-        data.generatedSections.values(),
-        dartClass.bracket!
-      );
-      // if !foundSection then there will be no diagnostic
-      if (!classRange.contains(range) && !foundSection) {
-        continue;
-      }
-
-      const action = new vscode.CodeAction(
-        "Generate Class Helpers",
-        vscode.CodeActionKind.QuickFix
-      );
-      const edit = this.getEditAndDiagnostic(
-        data,
-        dartClass,
-        document,
-        foundSection
-      );
-      action.edit = edit.edit;
-      if (edit.diagnostic) {
-        action.diagnostics = [edit.diagnostic];
-        diagnostics.push(edit.diagnostic);
-      }
-      action.isPreferred = true;
-      // Only show action within a class
-      if (classRange.intersection(range)) {
-        actions.push(action);
-        if (
-          this.analyzer.globalConfig?.generator &&
-          !foundSection?.comment?.generator
-        ) {
-          Object.entries(this.analyzer.globalConfig?.generator).forEach(
-            ([k]) => {
-              // TODO: test, don't show it it is the already generated generatorConfig in [action]
-              const actionForGenerator = new vscode.CodeAction(
-                `Generate Class Helpers: ${k}`,
-                vscode.CodeActionKind.QuickFix
-              );
-              actionForGenerator.command = COMMAND_GENERATE_DART_CLASS_HELPERS({
-                generatorConfig: k,
-                className: dartClass.name,
-                uri: pathFromUri(document.uri),
-              });
-              actions.push(actionForGenerator);
-            }
-          );
-        }
-      }
-    }
-
-    if (diagnostics.length > 0 || this.diagnosticCollection.has(document.uri)) {
-      this.diagnosticCollection.set(document.uri, diagnostics);
-    }
-    return actions;
-  }
-
-  getEditAndDiagnostic = (
-    data: ParsedDartFileData,
-    dartClass: DartClass,
-    document: vscode.TextDocument,
-    foundSection: GeneratedSection | undefined,
-    opts?: {
-      generatorConfig?: NamedGeneratorConfig;
-    }
-  ): {
-    edit: vscode.WorkspaceEdit;
-    diagnostic: vscode.Diagnostic | undefined;
-  } => {
-    const generatorOption = getGenerationOptionsByName(
-      foundSection?.comment?.generator,
-      this.analyzer.globalConfig
-    );
-    const generator = new ClassGenerator(
-      opts?.generatorConfig?.config ??
-        generatorOption?.config ??
-        data.config ??
-        {},
-      {
-        analyzer: this.analyzer,
-        outputFile: pathFromUri(document.uri),
-      },
-      {
-        ...(foundSection?.comment ?? {}),
-        generator: opts?.generatorConfig
-          ? opts?.generatorConfig.name
-          : foundSection?.comment?.generator,
-      }
-    );
-    const { content, md5Hash } = generator.generate(dartClass);
-    const originalEnd = dartClass.bracket!.originalEnd;
-    let rangeToEdit = new vscode.Range(
-      originalEnd.line,
-      originalEnd.column,
-      originalEnd.line,
-      originalEnd.column + 1
-    );
-    let diagnostic: vscode.Diagnostic | undefined;
-    if (foundSection) {
-      if (foundSection.md5Hash !== md5Hash) {
-        diagnostic = createOutOfDateDiagnostic(document, foundSection);
-      }
-      rangeToEdit = new vscode.Range(
-        foundSection.start.line,
-        0,
-        foundSection.end!.line + 1,
-        0
-      );
-    }
-
-    const edit = new vscode.WorkspaceEdit();
-    edit.replace(document.uri, rangeToEdit, content);
-    return { edit, diagnostic };
-  };
-
-  // resolveCodeAction(
-  //   codeAction: vscode.CodeAction,
-  //   token: vscode.CancellationToken
-  // ): vscode.ProviderResult<vscode.CodeAction> {
-  //   return codeAction;
-  // }
-}
-
-class DartFixImportsCodeAction extends vscode.CodeAction {
-  constructor() {
-    super("Fix Imports", vscode.CodeActionKind.Refactor);
-  }
-  command = COMMAND_OBJECT;
-  isPreferred = true;
-  diagnostics?: Array<vscode.Diagnostic>;
-}
 
 // this method is called when your extension is deactivated
 export function deactivate(): void {
